@@ -1061,10 +1061,17 @@ input:checked+.toggle-slider::before { transform:translateX(21px); }
 .absence-remove { background:none;border:none;color:var(--error);cursor:pointer;font-size:0.95rem;padding:0 0 0 7px; }
 .settings-danger-zone { background:rgba(224,85,85,0.06);border:1px solid rgba(224,85,85,0.28);border-radius:10px;padding:12px 15px;margin-bottom:8px; }
 .settings-danger-zone-title { font-size:0.70rem;font-weight:800;color:var(--error);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px;font-family:var(--font-main); }
+/* ── Dev-Log ─── */
+.devlog-list { display:flex; flex-direction:column; gap:14px; }
+.devlog-entry { background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px; padding:14px 18px; }
+.devlog-version { font-family:var(--font-accent); font-size:1.1rem; font-weight:800; color:var(--prestige-color); margin-bottom:4px; }
+.devlog-date { font-size:0.72rem; color:var(--text-muted); margin-bottom:8px; }
+.devlog-changes { font-size:0.83rem; color:var(--cream); line-height:1.6; }
 
 /* ══════════════════════════════════════════════════════════
    23. TOAST & XP-FLOAT
    ══════════════════════════════════════════════════════════ */
+
 #toast { position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);background:var(--navy-light);border:1px solid var(--prestige-color);color:var(--cream);padding:11px 22px;border-radius:50px;font-weight:700;font-size:0.86rem;z-index:9999;transition:transform .35s cubic-bezier(0.34,1.56,0.64,1),border-color .5s;box-shadow:0 8px 30px rgba(0,0,0,0.4);white-space:nowrap;pointer-events:none;font-family:var(--font-main); }
 #toast.show { transform:translateX(-50%) translateY(0); }
 .xp-float { position:fixed;pointer-events:none;z-index:9999;font-family:var(--font-accent);font-size:2rem;font-weight:900;color:var(--prestige-color);text-shadow:0 0 20px var(--prestige-glow);animation:floatUp 1.4s ease-out forwards; }
@@ -1110,6 +1117,7 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
       <ul class="disclaimer-list">
         <li>Die Teilnahme an diesem System ist freiwillig.</li>
         <li>Dein Abschneiden fließt nicht in deine offizielle Bewertung ein.</li>
+		<li>Gib nur die Codes ein, die du dir auch verdient hast!</li>
         <li>Gib deine freigespielten Codes nicht an andere weiter!</li>
       </ul>
     </div>
@@ -1124,14 +1132,14 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
     </div>
 
     <!-- Nickname -->
-    <div class="onboard-section-label">👤 Dein Nickname *</div>
+    <div class="onboard-section-label">👤 Dein Nickname</div>
     <input type="text" class="field-input" id="nameInput"
       placeholder="Dein Nickname..." maxlength="32"
       style="margin-bottom:6px" />
     <div class="onboard-required-err" id="nameErr">⚠️ Bitte gib deinen Nickname ein.</div>
 
     <!-- Anrede -->
-    <div class="onboard-section-label">🪪 Wie möchtest du angesprochen werden? *</div>
+    <div class="onboard-section-label">🪪 Wie möchtest du angesprochen werden?</div>
     <div class="onboard-gender-options">
       <button class="onboard-gender-btn" id="obGenderF" onclick="obSelectGender('female')">
         👩 Weiblich
@@ -1143,7 +1151,7 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
     <div class="onboard-required-err" id="genderErr">⚠️ Bitte wähle eine Anrede aus.</div>
 
     <!-- Modul -->
-    <div class="onboard-section-label">🏢 In welchem Modul bist du eingesetzt? *</div>
+    <div class="onboard-section-label">🏢 In welchem Modul bist du eingesetzt?</div>
     <div class="onboard-module-options" id="obModuleOptions">
       <button class="onboard-module-btn" onclick="obSelectModule('Personal & Organisation')">
         👥 Personal &amp; Organisation
@@ -1163,7 +1171,7 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
     </div>
     <div class="onboard-required-err" id="moduleErr">⚠️ Bitte wähle dein Modul aus.</div>
 
-    <p class="disclaimer-consent">Mit Klick auf „Jetzt starten" erklärst du dich bereit, diese Regeln zu respektieren.</p>
+    <p class="disclaimer-consent">Mit Klick auf „Jetzt starten" erklärst du dich bereit, die oben genannten Regeln zu respektieren. Viel Spaß!</p>
     <button class="btn btn-gold btn-wide" onclick="startOnboarding()">🚀 Jetzt starten</button>
   </div>
 </div>
@@ -1192,7 +1200,7 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
           <div class="intro-info-icon gold">⚡</div>
           <div>
             <div class="intro-info-title">XP sammeln &amp; aufsteigen</div>
-            <div class="intro-info-desc">Löse Codes ein, erledige Challenges und steige durch 10 Ränge auf!</div>
+            <div class="intro-info-desc">Löse Codes ein, erledige Challenges und steige Ränge und Prestige Level auf!</div>
           </div>
         </div>
         <div class="intro-info-item">
@@ -1358,6 +1366,17 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
     <div class="confirm-buttons">
       <button class="btn btn-danger btn-sm" onclick="confirmResetAll()">Ja, alles löschen</button>
       <button class="btn btn-ghost btn-sm"  onclick="closeModal('confirmModal')">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODUL-CHALLENGE: Code beim Ausbilder holen -->
+<div id="modulChallengeCodeInfoModal" class="modal-overlay hidden" data-modal="modulcodeinfo">
+  <div class="challenge-confirm-modal">
+    <h3>🌐 Modul-Challenge erledigt?</h3>
+    <p>Super! Hol dir jetzt den <strong>Bestätigungscode</strong> bei deinen Ausbilder*innen ab und gib ihn im Codes-Tab ein.</p>
+    <div class="flex-row" style="justify-content:center;gap:10px;margin-top:14px">
+      <button class="btn btn-gold btn-sm" onclick="closeModal('modulChallengeCodeInfoModal')">✅ Alles klar!</button>
     </div>
   </div>
 </div>
@@ -1665,16 +1684,6 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
     <div class="divider"></div>
 
     <div class="settings-section">
-      <div class="settings-section-title">🏅 Abzeichen &amp; Achievements sortieren</div>
-      <div class="flex-row">
-        <button class="btn btn-ghost btn-sm" id="sortStdBtn"   onclick="setBadgeSort('standard')">📌 Standard</button>
-        <button class="btn btn-ghost btn-sm" id="sortAlphaBtn" onclick="setBadgeSort('alpha')">🔤 Alphabetisch</button>
-      </div>
-    </div>
-
-    <div class="divider"></div>
-
-    <div class="settings-section">
       <div class="settings-section-title">🏫 Berufsschultage (kein Streak-Verlust)</div>
       <p class="hint" style="margin-bottom:8px">Kein Streak-Verlust und keine Aktivitäts-Strafe an Schultagen.</p>
       <div class="school-days-grid">
@@ -1714,7 +1723,7 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
       <button class="btn btn-danger btn-sm" onclick="closeModal('settingsModal');openConfirmModal()">🗑️ Konto komplett zurücksetzen</button>
     </div>
 
-    <div style="font-size:0.73rem;color:var(--text-muted);margin-bottom:4px">Version 6.0 &nbsp;·&nbsp; Next Level</div>
+    <div style="font-size:0.73rem;color:var(--text-muted);margin-bottom:4px">id="settingsVersion" &nbsp;·&nbsp; Next Level</div>
     <div style="font-size:0.70rem;color:var(--text-muted);margin-bottom:14px">© Ausbildungszentrum der Stadt Dortmund</div>
 
     <div class="flex-row" style="justify-content:flex-end">
@@ -1833,14 +1842,15 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
   <!-- ═══ SPALTE 2: Tabs ═══ -->
   <div>
     <div class="tile">
-      <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('code',this)">🔑 Code</button>
-        <button class="tab-btn" onclick="switchTab('badges',this)">🏅 Abzeichen</button>
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('code',this)">🔑 Codes</button>
+        <button class="tab-btn" onclick="switchTab('badges',this)">🏅 <span style="text-transform:uppercase;font-weight:900">ABZ</span>eichen</button>
         <button class="tab-btn" onclick="switchTab('challenges',this)">🎯 Challenges</button>
         <button class="tab-btn" onclick="switchTab('achievements',this)">🏆 Achievements</button>
-        <button class="tab-btn" onclick="switchTab('logbuch',this)">📖 Logbuch</button>
         <button class="tab-btn" onclick="switchTab('leaderboard',this)">📊 Bestenliste</button>
         <button class="tab-btn" onclick="switchTab('backup',this)">💾 Backup</button>
+        <button class="tab-btn" onclick="switchTab('logbuch',this)">📖 Logbuch</button>
+        <button class="tab-btn" onclick="switchTab('devlog',this)">📋 Dev-Log</button>
       </div>
 
       <!-- TAB: Code -->
@@ -1962,7 +1972,11 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
         <div id="adminBadgeHint" style="display:none;background:rgba(201,168,76,0.08);border:1px solid rgba(201,168,76,0.35);border-radius:8px;padding:7px 13px;font-size:0.76rem;color:#c9a84c;margin-bottom:12px">
           🛡️ Admin-Modus: Klicke ein Abzeichen zum Zurücksetzen.
         </div>
-        <div class="badge-section" id="badgeSectionRegular">
+       <div class="flex-row" style="gap:8px;margin-bottom:12px">
+          <button id="badgeSortStdBtn"   class="btn btn-sm btn-gold"  onclick="setBadgeSortDirect('standard')">📋 Standard</button>
+          <button id="badgeSortAlphaBtn" class="btn btn-sm btn-ghost" onclick="setBadgeSortDirect('alpha')">🔤 Alphabetisch</button>
+        </div>
+	   <div class="badge-section" id="badgeSectionRegular">
           <div class="badge-section-title">🏅 Reguläre Abzeichen<span class="badge-cat-stats" id="catStatsReg"></span></div>
           <div class="badge-grid" id="badgeGridRegular"></div>
         </div>
@@ -2075,7 +2089,6 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
     <div class="tile-title"><span class="icon">📖</span> Logbuch</div>
     <p style="color:var(--text-muted);font-size:0.84rem;margin-bottom:14px;line-height:1.55">
       Hier siehst du, wann du welche Abzeichen, Achievements und Belohnungen erhalten hast.<br>
-      <strong style="color:var(--prestige-color)">Hinweis:</strong> Aus Datenschutzgründen werden hier keine Codes angezeigt.
     </p>
     <div id="logbuchList" class="logbuch-list">
       <div class="logbuch-empty">
@@ -2085,6 +2098,12 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
     </div>
   </div>
 
+  <!-- TAB: Dev-Log -->
+  <div class="tab-panel" id="tab-devlog">
+    <div class="tile-title"><span class="icon">📋</span> Dev-Log — Änderungshistorie</div>
+    <p style="color:var(--text-muted);font-size:0.84rem;margin-bottom:16px">Hier sind alle Versionen und Änderungen dokumentiert.</p>
+    <div class="devlog-list" id="devlogList"></div>
+  </div>
 
   <!-- TAB: Bestenliste — mit Modul-Spalte, Filter & Modulstatistik -->
   <div class="tab-panel" id="tab-leaderboard">
@@ -2122,8 +2141,7 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
     <strong class="text-gold" style="font-size:0.84rem">▼ EXPORT</strong>
     <textarea class="backup-code mt-8" id="exportCode" readonly placeholder="Klicke auf 'Exportieren'…"></textarea>
     <div class="flex-row mt-8">
-      <button class="btn btn-gold btn-sm"  onclick="exportSave()">📤 Exportieren</button>
-      <button class="btn btn-ghost btn-sm" onclick="copyExport()">📋 Kopieren</button>
+      <button class="btn btn-gold btn-sm" onclick="exportAndCopy()">📤 Exportieren &amp; Kopieren</button>
     </div>
     <div class="divider"></div>
     <strong class="text-gold" style="font-size:0.84rem">▲ IMPORT</strong>
@@ -2159,7 +2177,7 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
 </script>
 </body>
 </html>
-```
+
 <script>
 /* ╔══════════════════════════════════════════════════════════╗
    ║  NEXT LEVEL v6.0 — Vollständige Spiellogik              ║
@@ -2172,7 +2190,7 @@ const INTRO_CODE        = 'IchWerdeMeineCodesNiemalsWeitergeben';
 const MASTER_HASH       = 'R2VoZWltMTIzIQ==';        // btoa('Geheim123!')
 const DAILY_XP          = 75;
 const WEEKLY_XP         = 250;
-const GOOGLE_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQaCLC2H_tCLivGdkIvMayo_AHIFr1vMN1_B85zSnhlOl6Dr36my5Zz7A_g1Yr9bKxoyX70BotT8s5F/pub?output=csv';
+const GOOGLE_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/1PDwZYVNkh4oyKmJxIRtSM-v4j82lLlBOcVyw_gjQ3QI/export?format=csv&gid=0';
 
 /* ═══════════════════════════════════════════════════════════
    1. RÄNGE — genderspezifisch
@@ -2775,36 +2793,68 @@ function handleModalKeys(e) {
   const introModal = document.getElementById('introModal');
   if (!introModal.classList.contains('hidden')) {
     if (key === ' ' || key === 'Enter') {
-      // Nicht auslösen, wenn das Code-Eingabefeld fokussiert ist
       if (document.activeElement?.id === 'introCodeInput') return;
       e.preventDefault();
       if (_currentIntroStep === 0) introNextStep();
       else if (_currentIntroStep === 2) introFinish();
     }
-    return; // Während Intro keine anderen Modal-Shortcuts
+    return;
   }
 
-  // ── Admin-User-Detail-Modal: Esc / Enter / Space ──────
+  // ── Admin-User-Detail-Modal ───────────────────────────
   const adminDetail = document.getElementById('adminUserDetailModal');
-  if (!adminDetail.classList.contains('hidden')) {
+  if (adminDetail && !adminDetail.classList.contains('hidden')) {
     if (key === 'Escape' || key === 'Enter' || key === ' ') {
-      e.preventDefault();
-      closeModal('adminUserDetailModal');
-      return;
+      e.preventDefault(); closeModal('adminUserDetailModal'); return;
     }
   }
 
-  // ── Sonstige offene Modals: Escape schließt das oberste ─
-  if (key === 'Escape') {
-    const top = getTopModal();
-    if (top) {
-      const id = top.id;
-      if (id === 'achievementModal')   { closeAchievementModal(); return; }
-      if (id === 'levelUpModal')       { closeLevelUpModal();     return; }
-      if (id === 'challengeCodeModal') { closeChallengeCode();    return; }
-      closeModal(id);
-    }
+  // ── Sonstige Modals: Leertaste & Enter & Escape ───────
+  const top = getTopModal();
+  if (!top) return;
+  const id = top.id;
+
+  // Leertaste nicht auslösen wenn Eingabefeld aktiv
+  if (key === ' ' || key === 'Spacebar') {
+    const f = document.activeElement;
+    if (f && ['INPUT','TEXTAREA','SELECT'].includes(f.tagName)) return;
+    e.preventDefault();
+    _handleEscForModal(id);
+    return;
   }
+
+  if (key === 'Escape') {
+    e.preventDefault();
+    _handleEscForModal(id);
+    return;
+  }
+
+  if (key === 'Enter') {
+    const f = document.activeElement;
+    if (f && ['INPUT','TEXTAREA','SELECT'].includes(f.tagName)) return;
+    e.preventDefault();
+    if      (id === 'prestigeConfirmModal')  doPrestige();
+    else if (id === 'challengeConfirmModal') confirmChallengeDone();
+    else if (id === 'confirmModal')          confirmResetAll();
+    else if (id === 'levelUpModal')          closeLevelUpModal();
+    else if (id === 'prestigeModal')         closePrestigeModal();
+    else if (id === 'achievementModal')      closeAchievementModal();
+    else if (id === 'infoModal')             closeModal('infoModal');
+    else if (id === 'streakInfoModal')       closeModal('streakInfoModal');
+    else if (id === 'fortschrittInfoModal')  closeModal('fortschrittInfoModal');
+    else if (id === 'challengeCodeModal')    closeChallengeCode();
+    else if (id === 'settingsModal')         saveSettings();
+    else if (id === 'disclaimerModal')       closeDisclaimerBackToSettings();
+    else                                     closeModal(id);
+  }
+}
+
+function _handleEscForModal(id) {
+  if      (id === 'levelUpModal')     closeLevelUpModal();
+  else if (id === 'prestigeModal')    closePrestigeModal();
+  else if (id === 'achievementModal') closeAchievementModal();
+  else if (id === 'disclaimerModal')  closeDisclaimerBackToSettings();
+  else                                closeModal(id);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -3031,6 +3081,8 @@ function adminTestModuleChallenges() {
   console.log(`[Admin] Teste Modul-Challenges für: ${_adminModuleTest || '(User-Modul)'}`);
   loadModuleChallenges();
   showToast(`🧪 Lade Modul-Challenges für: ${_adminModuleTest || state.module}`);
+  // Score-Modul für Admin-Test temporär anpassen
+  _adminModuleForScore = _adminModuleTest;
 }
 
 function adminResetModuleTest() {
@@ -3362,10 +3414,15 @@ function renderRankList() {
     const isActive = r.level === cur.level;
     const isLocked = r.xp > state.xp;
 
-    // Zweizeilige Darstellung für Kompetenzsammler/in
     let displayName = r.name;
+    
+    // Zweizeilige Darstellung für Kompetenzsammler/in
     if (r.name === 'Kompetenzsammlerin') displayName = 'Kompetenz-<br>sammlerin';
     if (r.name === 'Kompetenzsammler')   displayName = 'Kompetenz-<br>sammler';
+        
+    // Zweizeilige Darstellung für Verwaltungsmeister/in
+    if (r.name === 'Verwaltungsmeisterin' || r.name === 'Verwaltungsmeiterin') displayName = 'Verwaltungs-<br>meisterin';
+    if (r.name === 'Verwaltungsmeister' || r.name === 'Verwaltungsmeiter')   displayName = 'Verwaltungs-<br>meister';
 
     return `<div class="rank-item${isActive ? ' active' : ''}${isLocked ? ' locked' : ''}">
       <div class="rank-icon">${r.icon}</div>
@@ -3817,8 +3874,10 @@ function generatePersonalChallengeCode(type) {
 }
 
 function _redeemLvlCode(fb, input) {
+  const adminOk = document.getElementById('adminPanel')?.classList.contains('visible');
+  if (!adminOk) { _showCodeFeedback(fb,'error','❌ Unbekannter Code. Bitte überprüfe die Eingabe.'); if(input) input.value=''; return; }
   const next = getNextRank();
-  if (!next) { _showCodeFeedback(fb,'error','⚠️ Du bist bereits auf dem Maximal-Rang!'); return; }
+  if (!next) { _showCodeFeedback(fb,'error','⚠️ Du bist bereits auf dem Maximal-Rang!'); if(input) input.value=''; return; }
   const xp  = Math.max(1, next.xp - state.xp);
   state.xp += xp; state.totalXP = (state.totalXP||0) + xp;
   spawnXPFloat(xp);
@@ -3829,11 +3888,14 @@ function _redeemLvlCode(fb, input) {
 }
 
 function _redeemPrestigeCode(fb, input) {
-  const bonus = (state.prestige + 1) * 100;
-  state.xp += bonus; state.totalXP = (state.totalXP||0) + bonus;
-  spawnXPFloat(bonus);
+  const adminOk = document.getElementById('adminPanel')?.classList.contains('visible');
+  if (!adminOk) { _showCodeFeedback(fb,'error','❌ Unbekannter Code. Bitte überprüfe die Eingabe.'); if(input) input.value=''; return; }
+  const needed = Math.max(0, MAX_XP - state.xp);
+  if (needed <= 0) { _showCodeFeedback(fb,'error','⚠️ Du bist bereits auf dem Maximal-XP-Stand!'); if(input) input.value=''; return; }
+  state.xp += needed; state.totalXP = (state.totalXP||0) + needed;
+  spawnXPFloat(needed);
   if(input) input.value = '';
-  _showCodeFeedback(fb,'success',`✨ +${bonus} XP Prestige-Bonus!`);
+  _showCodeFeedback(fb,'success',`✨ +${needed} XP Prestige-Boost! Jetzt aufsteigen!`);
   const newAchs = checkAchievements(), gainedRanks = checkRankUp();
   saveState(); render(); scheduleModals(gainedRanks, newAchs);
 }
@@ -3938,69 +4000,63 @@ function closeChallengeConfirm() {
   closeModal('challengeConfirmModal');
 }
 
-function closeChallengeCode() {
-  const pending = state._pendingChallenges || {};
-  closeModal('challengeCodeModal');
+function confirmChallengeDone() {
+  closeChallengeConfirm();
+  const type = _pendingChallengeType;
+  if (!type) return;
 
-  // Code direkt in Eingabefeld einlösen
-  if (pending.code) {
-    const input = document.getElementById('codeInput');
-    const fb    = document.getElementById('codeFeedback');
-    if (input) input.value = pending.code;
-    // switchTab zu Code-Tab (damit Feedback sichtbar)
-    const codeTabBtn = document.querySelector('.tab-btn[onclick*="code"]');
-    if (codeTabBtn) switchTab('code', codeTabBtn);
-    if (pending.type === 'daily')  _handleDailyChallengeCode(pending.code, fb, input);
-    else if (pending.type === 'weekly') _handleWeeklyChallengeCode(pending.code, fb, input);
+  if (type === 'daily') {
+    // Persönliche Daily → direkt erledigen
+    const today = getTodayStr();
+    if (state.dailyDone[today]) { showToast('⚠️ Daily bereits erledigt!'); return; }
+    state.dailyDone[today] = true;
+    state.streakCount  = (state.streakCount||0) + 1;
+    state.streakFactor = (state.streakFactor||0) + 1;
+    state.streakMax    = Math.max(state.streakMax||0, state.streakFactor);
+    state.streakFrozen = false;
+    state.activityLastProcessed = today;
+    state.activityConsecutive = (state.activityConsecutive||0) + 1;
+    state.activityPos  = Math.min(40, (state.activityPos||20) + (state.activityConsecutive >= 3 ? 2 : 1));
+    pulseActivityBar('hot');
+    state.xp      += DAILY_XP;
+    state.totalXP  = (state.totalXP||0) + DAILY_XP;
+    spawnXPFloat(DAILY_XP);
+    addLogbuchEntry({
+      type:'challenge', icon:'🌅', typeLabel:'Persönliche Daily Challenge',
+      title:DAILY_CHALLENGES[dateSeed(today) % DAILY_CHALLENGES.length].title,
+      reward:`+${DAILY_XP} XP`, desc:'Daily Challenge erledigt!', ts:Date.now()
+    });
+    const newAchs = checkAchievements(), gainedRanks = checkRankUp();
+    saveState(); render(); scheduleModals(gainedRanks, newAchs);
+    showToast(`✅ Daily Challenge erledigt! +${DAILY_XP} XP 🔥`);
+
+  } else if (type === 'weekly') {
+    // Persönliche Weekly → direkt erledigen
+    const weekKey = getWeekKey();
+    if (state.weeklyDone[weekKey]) { showToast('⚠️ Weekly bereits erledigt!'); return; }
+    const wIdx  = dateSeed(weekKey) % WEEKLY_CHALLENGES.length;
+    const weekly = WEEKLY_CHALLENGES[wIdx];
+    state.weeklyDone[weekKey] = true;
+    if (weekly.badge && !state.unlockedBadges.some(b => b.name === weekly.badge.name)) {
+      const ts = Date.now();
+      state.unlockedBadges.push({ emoji:weekly.badge.emoji, name:weekly.badge.name, desc:weekly.badge.desc, ts });
+      addLogbuchEntry({ type:'badge', icon:weekly.badge.emoji, typeLabel:'Wöchentliches Abzeichen',
+        title:weekly.badge.name, reward:'+Badge', desc:weekly.badge.desc, ts });
+    }
+    state.xp      += WEEKLY_XP;
+    state.totalXP  = (state.totalXP||0) + WEEKLY_XP;
+    spawnXPFloat(WEEKLY_XP);
+    pulseActivityBar('hot');
+    addLogbuchEntry({ type:'challenge', icon:'📅', typeLabel:'Persönliche Weekly Challenge',
+      title:weekly.title, reward:`+${WEEKLY_XP} XP`, desc:'Weekly Challenge erledigt!', ts:Date.now() });
+    const newAchs = checkAchievements(), gainedRanks = checkRankUp();
+    saveState(); render(); scheduleModals(gainedRanks, newAchs);
+    showToast(`✅ Weekly erledigt! +${WEEKLY_XP} XP + Abzeichen 🎉`);
+
+  } else if (type === 'modulDaily' || type === 'modulWeekly') {
+    // Modul-Challenge → Info-Popup dass Code beim Ausbilder geholt werden muss
+    openModal('modulChallengeCodeInfoModal');
   }
-  state._pendingChallenges = {};
-}
-
-function copyChallengeCode() {
-  const code = document.getElementById('chalCodeDisplay')?.textContent || '';
-  navigator.clipboard.writeText(code)
-    .then(() => showToast('📋 Code kopiert!'))
-    .catch(() => showToast('⚠️ Kopieren fehlgeschlagen.'));
-}
-
-/** Modul-Challenge direkt abschließen (ohne separaten Code) */
-function completeModulChallenge(type) {
-  const isDaily = type === 'modulDaily';
-  const doneKey = isDaily ? getTodayStr() : getWeekKey();
-  const doneMap = isDaily ? state.modulDailyDone : state.modulWeeklyDone;
-
-  if (doneMap[doneKey]) { showToast('⚠️ Bereits erledigt!'); return; }
-
-  doneMap[doneKey] = true;
-  if (isDaily) state.modulDailyCount  = (state.modulDailyCount  || 0) + 1;
-  else         state.modulWeeklyCount = (state.modulWeeklyCount || 0) + 1;
-
-  const xp  = isDaily
-    ? (state._pendingChallenges?.dailyModulXP   || 50)
-    : (state._pendingChallenges?.weeklyModulXP  || 100);
-  const ttl = isDaily
-    ? (state._pendingChallenges?.dailyModulTitle  || 'Modul Daily Challenge')
-    : (state._pendingChallenges?.weeklyModulTitle || 'Modul Weekly Challenge');
-
-  state.xp      += xp;
-  state.totalXP  = (state.totalXP||0) + xp;
-  spawnXPFloat(xp);
-  pulseActivityBar('hot');
-
-  addLogbuchEntry({
-    type:'modul_challenge', icon: isDaily ? '🌅' : '📅',
-    typeLabel: isDaily ? 'Modul Daily Challenge' : 'Modul Weekly Challenge',
-    title: ttl, reward:`+${xp} XP`, desc:'Modul-Challenge erledigt!', ts:Date.now()
-  });
-
-  const newAchs    = checkAchievements();
-  const gainedRanks = checkRankUp();
-  saveState();
-  renderChallenges();
-  loadModuleChallenges(); // UI aktualisieren
-  _setEl('xpDisplay', state.xp.toLocaleString('de-DE'));
-  scheduleModals(gainedRanks, newAchs);
-  showToast(`✅ Modul-Challenge erledigt! +${xp} XP`);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -4035,7 +4091,7 @@ function renderBadges() {
       if (type === 'easter' && !unlocked) {
         return `<div class="badge-wrap">
           <div class="badge-card badge-locked" title="Noch nicht entdeckt">
-            <div class="badge-secret-icon">❓</div>
+            <div class="badge-secret-icon">👁️</div>
             <div class="badge-name">???</div>
           </div>
         </div>`;
@@ -4102,24 +4158,22 @@ function renderAchievements() {
   if (!el) return;
 
   const groupLabels = {
-    badges:           '🏅 Abzeichen',
+    badges:           '🏅 Standard',
     prestige:         '✨ Prestige',
     streak_activity:  '🔥 Streak & Activity',
     modul_challenges: '🌐 Modul-Challenges',
     office_map:       '🗺️ Office Map',
-    misc:             '😏 Sonstiges',
+    misc:             '⭐ Sonstige',
   };
 
-  const sorted = state.badgeSort === 'alpha'
-    ? [...ACHIEVEMENTS].sort((a,b) => a.name.localeCompare(b.name))
-    : ACHIEVEMENTS;
+  const sorted = ACHIEVEMENTS; // Immer in definierter Kategorien-Reihenfolge
 
   let lastGroup = null;
   let html = '';
   let unlocked = 0;
 
   sorted.forEach(ach => {
-    if (state.badgeSort !== 'alpha' && ach.group !== lastGroup) {
+    if (ach.group !== lastGroup) {
       lastGroup = ach.group;
       html += `<div class="ach-group-label">${groupLabels[ach.group] || ach.group}</div>`;
     }
@@ -4254,8 +4308,10 @@ function computeRarityFromEntries(entries) {
    ═══════════════════════════════════════════════════════════ */
 let _lbAllEntries    = [];
 let _lbCurrentFilter = 'all';
+let _adminModuleForScore = '';
 
 function copyScore() {
+  const effectiveModule = _adminModuleForScore || effectiveModule || '';
   const pc = getPrestigeConfig(state.prestige);
   const adminData = {
     badges:           state.unlockedBadges.map(b => b.name),
@@ -4273,7 +4329,7 @@ function copyScore() {
     officeMapStreak:  state.officeMapStreak  || 0,
     officeMapTotal:   state.officeMapTotal   || 0,
     gender:           state.gender,
-    module:           state.module,
+    module:           effectiveModule,
     schoolDayCount:   Object.values(state.schoolDays||{}).filter(Boolean).length,
     absenceCount:     (state.absences||[]).length,
     activeTitle:      getActiveTitleText()||'',
@@ -4296,7 +4352,7 @@ function copyScore() {
     p: state.prestige, pi:pc.icon, rk:getCurrentRank().name,
     ti:getActiveTitleText()||'',
     tp:state.activeTitle?(getAchById(state.activeTitle)?.title?.position||''):'',
-    mo:state.module||'',
+    mo:effectiveModule||'',
     _d:btoa(unescape(encodeURIComponent(JSON.stringify(adminData)))),
   };
 
@@ -4353,7 +4409,7 @@ function parseLeaderboard() {
       prestige:state.prestige, prestIcon:pc.icon, rank:getCurrentRank().name,
       title:getActiveTitleText()||'',
       titlePos:state.activeTitle?(getAchById(state.activeTitle)?.title?.position||''):'',
-      module:state.module||'', moduleAbbr:getModuleAbbr(state.module),
+      module:effectiveModule||'', moduleAbbr:getModuleAbbr(effectiveModule),
       isMe:true, _admin:null,
     });
   } else {
@@ -4390,8 +4446,8 @@ function _renderLeaderboardTable(entries, isAdmin) {
 
   const rows = sorted.map((e,i) => {
     const nameDisplay = e.title
-      ? formatNameWithTitle(e.name+(e.isMe?' 👈':''), e.title, e.titlePos)
-      : (e.name + (e.isMe ? ' 👈' : ''));
+      ? (e.isMe ? '👉 ' : '') + formatNameWithTitle(e.name, e.title, e.titlePos)
+      : ((e.isMe ? '👉 ' : '') + e.name);
     const piCell = e.prestige > 0 ? e.prestIcon : '–';
     const eyeCell = isAdmin
       ? `<button class="lb-eye-btn" title="Details" onclick="openAdminUserDetail(this)" data-entry='${JSON.stringify(e).replace(/'/g,"&#39;")}'>👁️</button>`
@@ -4524,6 +4580,29 @@ function openAdminUserDetail(btnEl) {
 /* ═══════════════════════════════════════════════════════════
    39. TABS
    ═══════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════════════════════
+   DEV-LOG DATEN
+   ═══════════════════════════════════════════════════════════ */
+const DEV_LOG = [
+  { version:'1.0', date:'27.03.2026', changes:'Erstentwurf der initialen Idee.' },
+  { version:'2.0', date:'', changes:'Platzhaltertext für Version 2.0.' },
+  { version:'3.0', date:'', changes:'Platzhaltertext für Version 3.0.' },
+  { version:'4.0', date:'', changes:'Platzhaltertext für Version 4.0.' },
+  { version:'5.0', date:'', changes:'Platzhaltertext für Version 5.0.' },
+  { version:'6.0', date:'', changes:'Platzhaltertext für Version 6.0.' },
+];
+
+function renderDevLog() {
+  const el = document.getElementById('devlogList'); if (!el) return;
+  el.innerHTML = [...DEV_LOG].reverse().map(e => `
+    <div class="devlog-entry">
+      <div class="devlog-version">Version ${e.version}</div>
+      ${e.date ? `<div class="devlog-date">📅 ${e.date}</div>` : ''}
+      <div class="devlog-changes">${e.changes}</div>
+    </div>`).join('');
+}
+
 function switchTab(id, btn) {
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.tab-btn').forEach(b   => b.classList.remove('active'));
@@ -4533,6 +4612,7 @@ function switchTab(id, btn) {
   if (id === 'badges')       renderBadges();
   if (id === 'achievements') { renderAchievements(); updateTitleSelector(); }
   if (id === 'logbuch')      renderLogbuch();
+  if (id === 'devlog')       renderDevLog();
   if (id === 'challenges')   { renderChallenges(); loadModuleChallenges(); }
 }
 
@@ -4545,6 +4625,10 @@ function openSettings() {
   if (inner) inner.scrollTop = 0;
 
   openModal('settingsModal');
+
+  // Version automatisch aus Dev-Log
+  const vEl = document.getElementById('settingsVersion');
+  if (vEl && DEV_LOG.length) vEl.textContent = 'v' + DEV_LOG[DEV_LOG.length - 1].version;
 
   // Aktuelle Werte laden
   const ni = document.getElementById('settingsNameInput');
@@ -4635,6 +4719,16 @@ function setBadgeSort(val) {
   state.badgeSort = val;
   document.getElementById('sortStdBtn')?.classList.toggle('active',  val !== 'alpha');
   document.getElementById('sortAlphaBtn')?.classList.toggle('active', val === 'alpha');
+}
+
+function setBadgeSortDirect(val) {
+  state.badgeSort = val;
+  saveState();
+  document.getElementById('badgeSortStdBtn')?.classList.toggle('btn-gold',  val === 'standard');
+  document.getElementById('badgeSortStdBtn')?.classList.toggle('btn-ghost', val !== 'standard');
+  document.getElementById('badgeSortAlphaBtn')?.classList.toggle('btn-gold',  val === 'alpha');
+  document.getElementById('badgeSortAlphaBtn')?.classList.toggle('btn-ghost', val !== 'alpha');
+  renderBadges();
 }
 
 /* Schultage */
@@ -4814,8 +4908,26 @@ function closePrestigeModal() { closeModal('prestigeModal'); }
 /* ═══════════════════════════════════════════════════════════
    43. ADMIN-PANEL
    ═══════════════════════════════════════════════════════════ */
+function renderAdminCodeList() {
+  const el = document.getElementById('adminCodeList'); if (!el) return;
+  el.innerHTML = CODES.map(c => {
+    let plain = '(Fehler)'; try { plain = atob(c.hash); } catch(e) {}
+    return `<span style="color:#c9a84c">${plain.padEnd(14)}</span> → ` +
+      `<span style="color:var(--text-muted)">${c.hash}</span> | ` +
+      `<span style="color:var(--success)">${c.xp} XP</span> ${c.badge.emoji} ` +
+      `<em style="color:var(--text-muted)">${c.badge.name}</em>` +
+      `${c.adminOnly ? ' <em style="color:var(--warning)">[ADMIN]</em>' : ''}` +
+      `${c.secret    ? ' <em style="color:var(--error)">[GEHEIM]</em>'  : ''}`;
+  }).join('<br>');
+  const sd = document.getElementById('adminStreakDisplay');
+  const ad = document.getElementById('adminActivityDisplay');
+  if (sd) sd.textContent = state.streakFactor;
+  if (ad) ad.textContent = state.activityPos;
+}
+
 function openAdminPanel() {
   document.getElementById('adminPanel')?.classList.add('visible');
+  renderAdminCodeList();
   showToast('🛡️ Admin-Konsole aktiviert!');
 
   // Code-Liste befüllen
@@ -4924,23 +5036,28 @@ function adminResetModuleWeeklyChallenge() {
   showToast('📅 Modul-Weekly zurückgesetzt.');
 }
 
-function adminResetBadge(badgeName) {
-  if (!document.getElementById('adminPanel')?.classList.contains('visible')) return;
-  const idx = state.unlockedBadges.findIndex(b => b.name === badgeName);
-  if (idx < 0) return;
-  const badge = state.unlockedBadges[idx];
+function adminResetBadge(name, xp) {
+  if (!document.getElementById('adminPanel').classList.contains('visible')) return;
+  const idx = state.unlockedBadges.findIndex(b => b.name === name);
+  if (idx === -1) { showToast('ℹ️ Noch nicht freigeschaltet.'); return; }
+  if (!confirm(`Admin: „${name}" zurücksetzen?${xp > 0 ? ` (-${xp} XP)` : ''}`)) return;
   state.unlockedBadges.splice(idx, 1);
-  // Zugehörigen Code aus usedCodes entfernen
-  const code = CODES.find(c => c.badge?.name === badgeName);
-  if (code) {
-    state.usedCodes = state.usedCodes.filter(u => u.hash !== code.hash);
-    if (code.xp > 0) {
-      state.xp      = Math.max(0, state.xp      - code.xp);
-      state.totalXP = Math.max(0, state.totalXP - code.xp);
+  const codeEntry = CODES.find(c => c.badge?.name === name);
+  if (codeEntry) {
+    let plain = ''; try { plain = atob(codeEntry.hash); } catch(e) {}
+    state.usedCodes = state.usedCodes.filter(c => (typeof c === 'string' ? c : c.hash) !== codeEntry.hash);
+    if (codeEntry.adminOnly) {
+      state.adminCodeXP     = Math.max(0, (state.adminCodeXP||0) - codeEntry.xp);
+      state.adminCodeBadges = (state.adminCodeBadges||[]).filter(n => n !== name);
     }
   }
-  saveState(); render(); renderBadges();
-  showToast(`🗑️ „${badgeName}" zurückgesetzt.`);
+  if (xp > 0) { state.xp = Math.max(0, state.xp - xp); state.totalXP = Math.max(0, (state.totalXP||0) - xp); }
+  const easterBadge = EASTER_BADGES.find(b => b.name === name);
+  if (easterBadge?.xp > 0) {
+    state.xp = Math.max(0, state.xp - easterBadge.xp);
+    state.totalXP = Math.max(0, (state.totalXP||0) - easterBadge.xp);
+  }
+  saveState(); render(); renderBadges(); showToast(`🗑️ „${name}" zurückgesetzt.`);
 }
 
 /* ═══════════════════════════════════════════════════════════
@@ -4974,6 +5091,14 @@ function exportSave() {
   document.getElementById('exportCode').value =
     btoa(unescape(encodeURIComponent(JSON.stringify(state))));
   showToast('✅ Spielstand exportiert!');
+}
+
+function exportAndCopy() {
+  const code = btoa(unescape(encodeURIComponent(JSON.stringify(state))));
+  document.getElementById('exportCode').value = code;
+  navigator.clipboard.writeText(code)
+    .then(() => showToast('✅ Exportiert & in Zwischenablage kopiert!'))
+    .catch(() => showToast('✅ Exportiert! Bitte manuell kopieren.'));
 }
 
 function copyExport() {
