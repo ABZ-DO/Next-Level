@@ -603,8 +603,9 @@ html.light-mode header { background:rgba(240,246,255,0.96); }
 .badge-card.unlocked .badge-name { color:var(--prestige-color); }
 .badge-secret-icon { position:relative;display:inline-block;font-size:1.95rem;line-height:1.2;margin-bottom:6px;flex-shrink:0; }
 .badge-secret-icon::after { content:'';position:absolute;top:8%;left:8%;width:84%;height:84%;background:linear-gradient(to bottom right,transparent 42%,var(--error) 42%,var(--error) 58%,transparent 58%);pointer-events:none; }
-.badge-cookie-wrap { display:flex;align-items:center;gap:3px;margin-bottom:6px;flex-shrink:0; }
-.badge-cookie-mini { font-size:0.85rem; }
+.badge-cookie-wrap { display:flex;align-items:center;justify-content:center;margin-bottom:6px;flex-shrink:0; }
+.badge-cookie-mini { font-size:1.95rem; }
+.badge-cookie-mini + .badge-cookie-mini { display:none; }
 .badge-tooltip { position:absolute;bottom:calc(100%+7px);left:50%;transform:translateX(-50%);background:var(--navy-light);border:1px solid var(--prestige-color);color:var(--cream);padding:7px 13px;border-radius:8px;font-size:0.73rem;min-width:130px;max-width:190px;z-index:9200;opacity:0;pointer-events:none;transition:opacity .2s;box-shadow:0 4px 14px rgba(0,0,0,0.4);text-align:center;line-height:1.4;font-family:var(--font-main); }
 .badge-tooltip-name { font-weight:800;margin-bottom:3px; }
 .badge-tooltip-desc { color:var(--text-muted);font-size:0.68rem; }
@@ -1870,13 +1871,12 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
         <div class="office-map-info-text">
           <div class="office-map-info-title">Magnete richtig gesetzt?</div>
           <div class="office-map-info-desc">
-            Hast du auch überprüft, ob die Magnete der anwesenden und mobilen Azubis richtig gesetzt wurden?
-            Hier ist Teamwork gefragt! 💪
+            Magnete der anwesenden/mobilen Azubis korrekt gesetzt?
           </div>
         </div>
       </div>
       <div class="office-map-note">
-        Bist du im Home Office, erkundige dich, ob deine Teamkollegen dich eingecheckt haben, bevor du bestätigst.
+        Im Home-Office: Team-Check-in vor Bestätigung prüfen.
       </div>
       <div class="office-map-done-msg" id="officeMapDoneMsg" style="display:none">
         ✅ Heute bereits eingecheckt! (+50 XP)
@@ -1899,7 +1899,7 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
     <div class="tile">
 <div class="tabs">
       <button class="tab-btn active" onclick="switchTab('code',this)">🔑 Codes</button>
-      <button class="tab-btn" onclick="switchTab('badges',this)">🏅 <span style="text-transform:uppercase;font-weight:900">ABZ</span>eichen</button>
+      <button class="tab-btn" onclick="switchTab('badges',this)">🏅 <span style="text-transform:none;letter-spacing:0.04em">ABZ<span style="text-transform:lowercase">eichen</span></span></button>
       <button class="tab-btn" onclick="switchTab('challenges',this)">🎯 Challenges</button>
       <button class="tab-btn" onclick="switchTab('achievements',this)">🏆 Achievements</button>
       <button class="tab-btn" onclick="switchTab('leaderboard',this)">📊 Bestenliste</button>
@@ -2246,6 +2246,7 @@ const MASTER_HASH       = 'R2VoZWltMTIzIQ==';        // btoa('Geheim123!')
 const DAILY_XP          = 75;
 const WEEKLY_XP         = 250;
 const GOOGLE_SHEETS_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vQaCLC2H_tCLivGdkIvMayo_AHIFr1vMN1_B85zSnhlOl6Dr36my5Zz7A_g1Yr9bKxoyX70BotT8s5F/pub?output=csv';
+const GOOGLE_SHEETS_PROXY = 'https://corsproxy.io/?';
 
 /* ═══════════════════════════════════════════════════════════
    1. RÄNGE — genderspezifisch
@@ -2881,7 +2882,8 @@ function handleModalKeys(e) {
 
   if (key === 'Escape') {
     e.preventDefault();
-    _handleEscForModal(id);
+    const top2 = getTopModal();
+    if (top2) _handleEscForModal(top2.id);
     return;
   }
 
@@ -3010,11 +3012,14 @@ async function loadModuleChallenges() {
     const csv  = await resp.text();
     _modulSheetData = parseCSV(csv);
 
-    // Nach aktivem Modul filtern (Aktiv === 'Ja')
-    const filtered = _modulSheetData.filter(row =>
-      row.Modul?.trim() === targetModule &&
-      row.Aktiv?.trim().toLowerCase() === 'ja'
-    );
+// Spaltennamen normalisieren (Groß/Klein, Leerzeichen egal)
+    const filtered = _modulSheetData.filter(row => {
+      const modulKey  = Object.keys(row).find(k => k.trim().toLowerCase() === 'modul');
+      const aktivKey  = Object.keys(row).find(k => k.trim().toLowerCase() === 'aktiv');
+      const modulVal  = modulKey  ? (row[modulKey]  || '').trim() : '';
+      const aktivVal  = aktivKey  ? (row[aktivKey]  || '').trim().toLowerCase() : 'ja';
+      return modulVal === targetModule && (aktivVal === 'ja' || aktivVal === '');
+    });
 
     _renderModulChallenge('daily',  filtered);
     _renderModulChallenge('weekly', filtered);
@@ -3829,11 +3834,6 @@ function processCode(found, input, fb) {
     });
   }
 
-  if (!found.adminOnly) {
-    state.activityConsecutive = (state.activityConsecutive||0) + 1;
-    state.activityPos = Math.min(40, (state.activityPos||20) + 1);
-    pulseActivityBar('hot');
-  }
   if (found.adminOnly) {
     state.adminCodeXP = (state.adminCodeXP||0) + found.xp;
     if (found.badge) state.adminCodeBadges.push(found.badge.name);
@@ -4671,12 +4671,16 @@ function openAdminUserDetail(btnEl) {
    DEV-LOG DATEN
    ═══════════════════════════════════════════════════════════ */
 const DEV_LOG = [
-  { version:'1.0', date:'27.03.2026', changes:'Erstentwurf der initialen Idee.' },
-  { version:'2.0', date:'', changes:'Platzhaltertext für Version 2.0.' },
-  { version:'3.0', date:'', changes:'Platzhaltertext für Version 3.0.' },
-  { version:'4.0', date:'', changes:'Platzhaltertext für Version 4.0.' },
-  { version:'5.0', date:'', changes:'Platzhaltertext für Version 5.0.' },
-  { version:'6.0', date:'', changes:'Platzhaltertext für Version 6.0.' },
+  { version:'1.0', date:'27.03.2026', changes:'Erstentwurf der initialen Idee, Machbarkeitsprüfung und Funktionstests.' },
+  { version:'2.0', date:'28.03.2026', changes:'Erschließung neuer Programmierumgebung. Strukturiertes Prompting und neues Design.' },
+  { version:'3.0', date:'30.03.2026', changes:'Implementierung der Ränge, Abzeichen, Bestenliste und Backup-Funktion.' },
+  { version:'3.1', date:'01.04.2026', changes:'Bugfixes & Funktionserweiterungen.' },
+  { version:'3.2', date:'02.04.2026', changes:'weitere Bugfixes & Funktionserweiterungen.' },
+  { version:'3.3', date:'03.04.2026', changes:'Implementierung Fortschritts- und Prestige-System.' },
+  { version:'4.0', date:'04.04.2026', changes:'Bugfixes, Implementierung Admin-Konsole, weitere Abzeichen.' },
+  { version:'5.0', date:'05.04.2026', changes:'Bugfixes, Implementierung Achievements und persönliche Challenges.' },
+  { version:'5.1', date:'05.04.2026', changes:'Bugfixes, Implementierung Activity-Bar und Streak-System.' },
+  { version:'6.0', date:'06.04.2026', changes:'Bugfixes, Implementierung Modul-Challenges, Dev-Log und Logbuch.' },
 ];
 
 function renderDevLog() {
@@ -4707,10 +4711,10 @@ function switchTab(id, btn) {
    ═══════════════════════════════════════════════════════════ */
 function openSettings() {
   // Einstellungen immer von oben starten
-  const inner = document.getElementById('settingsModalInner');
-  if (inner) inner.scrollTop = 0;
-
   openModal('settingsModal');
+  
+  const inner = document.getElementById('settingsModalInner');
+  if (inner) setTimeout(() => { inner.scrollTop = 0; }, 10);
 
   // Version automatisch aus Dev-Log
   const vEl = document.getElementById('settingsVersion');
@@ -5015,16 +5019,6 @@ function openAdminPanel() {
   document.getElementById('adminPanel')?.classList.add('visible');
   renderAdminCodeList();
   showToast('🛡️ Admin-Konsole aktiviert!');
-
-  // Code-Liste befüllen
-  const listEl = document.getElementById('adminCodeList');
-  if (listEl) {
-    listEl.innerHTML = CODES.map(c => {
-      const plain = atob(c.hash);
-      const used  = state.usedCodes.some(u => u.hash === c.hash) ? ' ✅' : '';
-      return `<div>${plain} → ${c.xp} XP${c.adminOnly?' [Admin]':''}${used}</div>`;
-    }).join('');
-  }
 
   // Admin-Badge-Hint
   document.getElementById('adminBadgeHint').style.display = 'block';
