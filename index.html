@@ -1142,59 +1142,63 @@ input:checked+.toggle-slider::before { transform:translateX(21px); }
 code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,255,255,0.07);padding:2px 5px;border-radius:4px; }
 </style>
 
-<!-- NEU: Firebase SDK — direkt vor </head> einfügen -->
-<script type="module">
-  // ════════════════════════════════════════════════
-  // DEINE FIREBASE-KONFIGURATION (aus Schritt 4 oben)
-  // ════════════════════════════════════════════════
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, doc, setDoc, getDocs, collection, onSnapshot }
-    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+<!-- Firebase Compat SDK (synchron, kein type="module" nötig) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+  // ════════════════════════════════════════
+  // FIREBASE KONFIGURATION — deine Daten bleiben gleich
+  // ════════════════════════════════════════
+  firebase.initializeApp({
+    apiKey:            "AIzaSyD3wIcDLetozVGBBjsDgy99ke6OLnYNj6E",
+    authDomain:        "next-level-abz.firebaseapp.com",
+    projectId:         "next-level-abz",
+    storageBucket:     "next-level-abz.firebasestorage.app",
+    messagingSenderId: "848071021663",
+    appId:             "1:848071021663:web:c418ea5269cae7a20fb7ea"
+  });
+  const _fbDB = firebase.firestore();
 
-  // ⚠️ ERSETZE DIESEN BLOCK MIT DEINER EIGENEN firebaseConfig:
-const firebaseConfig = {
-  apiKey: "AIzaSyD3wIcDLetozVGBBjsDgy99ke6OLnYNj6E",
-  authDomain: "next-level-abz.firebaseapp.com",
-  projectId: "next-level-abz",
-  storageBucket: "next-level-abz.firebasestorage.app",
-  messagingSenderId: "848071021663",
-  appId: "1:848071021663:web:c418ea5269cae7a20fb7ea"
-};
-
-  const app = initializeApp(firebaseConfig);
-  const db  = getFirestore(app);
-
-  // ── Score hochladen (wird nach jedem Code-Einlösen aufgerufen) ──
   window.firebaseUploadScore = async function(state) {
     if (!state.name) return;
-    const docRef = doc(db, 'leaderboard', state.name);
-    await setDoc(docRef, {
-      name:     state.name,
-      xp:       state.xp,
-      prestige: state.prestige || 0,
-      rank:     state.rank     || 1,
-      module:   state.module   || '–',
-      badges:   (state.unlockedBadges || []).length,
-      updated:  Date.now()
-    }, { merge: true });
+    try {
+      await _fbDB.collection('leaderboard').doc(state.name).set({
+        name:     state.name,
+        xp:       state.xp        || 0,
+        prestige: state.prestige   || 0,
+        rank:     state.rank       || 1,
+        module:   state.module     || '–',
+        badges:   (state.unlockedBadges || []).length,
+        gender:   state.gender     || 'male',
+        profilePic: state.profilePic || '',
+        updated:  Date.now()
+      }, { merge: true });
+    } catch(e) { console.warn('Firebase Upload Fehler:', e); }
   };
 
-  // ── Live-Bestenliste laden & anzeigen (Echtzeit) ──
   window.firebaseSubscribeLeaderboard = function(callback) {
-    const col = collection(db, 'leaderboard');
-    return onSnapshot(col, snapshot => {
+    return _fbDB.collection('leaderboard').onSnapshot(snapshot => {
       const entries = [];
       snapshot.forEach(d => entries.push(d.data()));
-      entries.sort((a, b) => b.xp - a.xp);
+      entries.sort((a, b) => (b.xp||0) - (a.xp||0));
       callback(entries);
-    });
+    }, err => console.warn('Firebase Listener Fehler:', err));
   };
 
-  // Globale DB-Referenz für Benutzerverwaltung
-  window._db = db;
-  window._firestoreDoc = doc;
-  window._firestoreGetDocs = getDocs;
-  window._firestoreCollection = collection;
+  window.firebaseGetAllUsers = async function() {
+    const snap = await _fbDB.collection('leaderboard').get();
+    const users = [];
+    snap.forEach(d => users.push({ id: d.id, ...d.data() }));
+    return users;
+  };
+
+  window.firebaseDeleteUser = async function(name) {
+    await _fbDB.collection('leaderboard').doc(name).delete();
+  };
+
+  window.firebaseCreateTestUser = async function(data) {
+    await _fbDB.collection('leaderboard').doc(data.name).set(data);
+  };
 </script>
 
 </head>
