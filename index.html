@@ -1109,8 +1109,25 @@ input:checked+.toggle-slider::before { transform:translateX(21px); }
 #toast.show { transform:translateX(-50%) translateY(0); }
 .xp-float { position:fixed;pointer-events:none;z-index:9999;font-family:var(--font-accent);font-size:2rem;font-weight:900;color:var(--prestige-color);text-shadow:0 0 20px var(--prestige-glow);animation:floatUp 1.4s ease-out forwards; }
 @keyframes floatUp { from{opacity:1;transform:translateY(0) scale(0.7)}to{opacity:0;transform:translateY(-100px) scale(1.3)} }
-@keyframes rainbow-border { 0%{border-color:#ff4444}20%{border-color:#ffaa00}40%{border-color:#44ff44}60%{border-color:#00aaff}80%{border-color:#aa44ff}100%{border-color:#ff4444} }
-.prestige-rainbow .tile::before,.prestige-rainbow header { animation:rainbow-border 3s infinite; }
+@keyframes rainbow-border {
+  0%  { border-color:#ff4444; }
+  20% { border-color:#ffaa00; }
+  40% { border-color:#44ff44; }
+  60% { border-color:#00aaff; }
+  80% { border-color:#aa44ff; }
+  100%{ border-color:#ff4444; }
+}
+/* NEU: Regenbogen-Gradient für den Trennstrich oben an den Kacheln */
+@keyframes rainbow-line {
+  0%   { background: linear-gradient(90deg, #ff4444, #ffaa00, #44ff44); }
+  33%  { background: linear-gradient(90deg, #44ff44, #00aaff, #aa44ff); }
+  66%  { background: linear-gradient(90deg, #aa44ff, #ff4444, #ffaa00); }
+  100% { background: linear-gradient(90deg, #ff4444, #ffaa00, #44ff44); }
+}
+
+.prestige-rainbow header {
+  animation: rainbow-border 3s infinite;
+}
 
 /* ══════════════════════════════════════════════════════════
    24. HILFSKLASSEN
@@ -1124,6 +1141,62 @@ input:checked+.toggle-slider::before { transform:translateX(21px); }
 .text-gold { color:var(--prestige-color); }
 code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,255,255,0.07);padding:2px 5px;border-radius:4px; }
 </style>
+
+<!-- NEU: Firebase SDK — direkt vor </head> einfügen -->
+<script type="module">
+  // ════════════════════════════════════════════════
+  // DEINE FIREBASE-KONFIGURATION (aus Schritt 4 oben)
+  // ════════════════════════════════════════════════
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getFirestore, doc, setDoc, getDocs, collection, onSnapshot }
+    from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+  // ⚠️ ERSETZE DIESEN BLOCK MIT DEINER EIGENEN firebaseConfig:
+const firebaseConfig = {
+  apiKey: "AIzaSyD3wIcDLetozVGBBjsDgy99ke6OLnYNj6E",
+  authDomain: "next-level-abz.firebaseapp.com",
+  projectId: "next-level-abz",
+  storageBucket: "next-level-abz.firebasestorage.app",
+  messagingSenderId: "848071021663",
+  appId: "1:848071021663:web:c418ea5269cae7a20fb7ea"
+};
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
+
+  // ── Score hochladen (wird nach jedem Code-Einlösen aufgerufen) ──
+  window.firebaseUploadScore = async function(state) {
+    if (!state.name) return;
+    const docRef = doc(db, 'leaderboard', state.name);
+    await setDoc(docRef, {
+      name:     state.name,
+      xp:       state.xp,
+      prestige: state.prestige || 0,
+      rank:     state.rank     || 1,
+      module:   state.module   || '–',
+      badges:   (state.unlockedBadges || []).length,
+      updated:  Date.now()
+    }, { merge: true });
+  };
+
+  // ── Live-Bestenliste laden & anzeigen (Echtzeit) ──
+  window.firebaseSubscribeLeaderboard = function(callback) {
+    const col = collection(db, 'leaderboard');
+    return onSnapshot(col, snapshot => {
+      const entries = [];
+      snapshot.forEach(d => entries.push(d.data()));
+      entries.sort((a, b) => b.xp - a.xp);
+      callback(entries);
+    });
+  };
+
+  // Globale DB-Referenz für Benutzerverwaltung
+  window._db = db;
+  window._firestoreDoc = doc;
+  window._firestoreGetDocs = getDocs;
+  window._firestoreCollection = collection;
+</script>
+
 </head>
 <body>
 
@@ -1912,6 +1985,7 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
       <button class="tab-btn" onclick="switchTab('challenges',this)">🎯 Challenges</button>
       <button class="tab-btn" onclick="switchTab('achievements',this)">🏆 Achievements</button>
       <button class="tab-btn" onclick="switchTab('leaderboard',this)">📊 Bestenliste</button>
+	  <button class="tab-btn" id="userMgmtTabBtn" onclick="switchTab('usermgmt',this)" style="display:none">👥 Benutzerverwaltung</button>
       <button class="tab-btn" onclick="switchTab('backup',this)">💾 Backup</button>
       <button class="tab-btn" onclick="switchTab('logbuch',this)">📖 Logbuch</button>
       <button class="tab-btn" onclick="switchTab('devlog',this)">📋 Dev-Log</button>
@@ -2174,33 +2248,50 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
   </div>
 
   <!-- TAB: Bestenliste — mit Modul-Spalte, Filter & Modulstatistik -->
-  <div class="tab-panel" id="tab-leaderboard">
-    <div class="tile-title"><span class="icon">📊</span> Bestenliste</div>
-    <p style="color:var(--text-muted);font-size:0.84rem;margin-bottom:12px">Kopiere deinen Score und trage ihn in <code>punkte.txt</code> auf dem Netzlaufwerk ein.</p>
-    <div class="flex-row">
-      <button class="btn btn-gold btn-sm" onclick="copyScore()">📋 Meinen Score kopieren</button>
-      <span class="hint">→ Dann in punkte.txt eintragen</span>
-    </div>
-    <div class="divider"></div>
-    <p style="color:var(--text-muted);font-size:0.81rem;margin-bottom:8px">Gesamten Inhalt von <strong>punkte.txt</strong> hier einfügen:</p>
-    <textarea class="lb-textarea" id="lbInput" placeholder="Zeilenweise Einträge einfügen…"></textarea>
-    <div class="flex-row mt-8" style="flex-wrap:wrap;gap:8px">
-      <button class="btn btn-ghost btn-sm" onclick="parseLeaderboard()">📊 Bestenliste anzeigen</button>
-      <button class="btn btn-ghost btn-sm" onclick="showModuleStats()">📈 Modulstatistik anzeigen</button>
-    </div>
-    <!-- Modul-Filter (wird via JS eingeblendet) -->
-    <div class="lb-filter-row" id="lbFilterRow" style="display:none">
-      <span class="lb-filter-label">Filter:</span>
-      <button class="lb-filter-btn active" onclick="filterLeaderboard('all',this)">Alle</button>
-      <button class="lb-filter-btn" onclick="filterLeaderboard('P&O',this)">P&amp;O</button>
-      <button class="lb-filter-btn" onclick="filterLeaderboard('F',this)">F</button>
-      <button class="lb-filter-btn" onclick="filterLeaderboard('R&O',this)">R&amp;O</button>
-      <button class="lb-filter-btn" onclick="filterLeaderboard('LV',this)">LV</button>
-      <button class="lb-filter-btn" onclick="filterLeaderboard('D',this)">D</button>
-    </div>
-    <div id="lbTableWrap"></div>
-  </div>
+<!-- ERSETZE DEN ALTEN tab-leaderboard BLOCK KOMPLETT: -->
+<div class="tab-panel" id="tab-leaderboard">
+  <div class="tile-title"><span class="icon">📊</span> Live-Bestenliste</div>
+  <p style="color:var(--text-muted);font-size:0.84rem;margin-bottom:12px">
+    🔴 Live – wird automatisch aktualisiert.
+  </p>
 
+  <!-- Modul-Filter -->
+  <div class="lb-filter-row" id="lbFilterRow">
+    <span class="lb-filter-label">Filter:</span>
+    <button class="lb-filter-btn active" onclick="filterLeaderboardLive('all',this)">Alle</button>
+    <button class="lb-filter-btn" onclick="filterLeaderboardLive('P&O',this)">P&amp;O</button>
+    <button class="lb-filter-btn" onclick="filterLeaderboardLive('F',this)">F</button>
+    <button class="lb-filter-btn" onclick="filterLeaderboardLive('R&O',this)">R&amp;O</button>
+    <button class="lb-filter-btn" onclick="filterLeaderboardLive('LV',this)">LV</button>
+    <button class="lb-filter-btn" onclick="filterLeaderboardLive('D',this)">D</button>
+  </div>
+  <div id="lbTableWrap"><p style="color:var(--text-muted);font-size:0.84rem">⏳ Verbinde mit Datenbank…</p></div>
+</div>
+
+<!-- TAB: Benutzerverwaltung (nur Admin) -->
+<div class="tab-panel" id="tab-usermgmt" style="display:none">
+  <div class="tile-title"><span class="icon">👥</span> Benutzerverwaltung</div>
+
+  <!-- Liste aller User -->
+  <div style="margin-bottom:16px">
+    <button class="btn btn-ghost btn-sm" onclick="loadUserMgmtList()">🔄 Aktualisieren</button>
+  </div>
+  <div id="userMgmtList"><p style="color:var(--text-muted);font-size:0.84rem">⏳ Lade Nutzer…</p></div>
+
+  <div class="divider"></div>
+
+  <!-- Test-User erstellen -->
+  <div class="tile-title" style="font-size:0.95rem;margin-bottom:12px"><span class="icon">🧪</span> Test-User erstellen</div>
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <input class="field-input" id="tuName"     placeholder="Name"           style="margin:0" />
+    <input class="field-input" id="tuXP"       placeholder="XP (z.B. 1500)" type="number" style="margin:0" />
+    <input class="field-input" id="tuRank"     placeholder="Rang (1–25)"    type="number" style="margin:0" />
+    <input class="field-input" id="tuPrestige" placeholder="Prestige (0–5)" type="number" style="margin:0" />
+    <input class="field-input" id="tuModule"   placeholder="Modul (P&O, F, R&O, LV, D)" style="margin:0" />
+    <input class="field-input" id="tuBadges"   placeholder="Anzahl Abzeichen" type="number" style="margin:0" />
+    <button class="btn btn-gold btn-sm" onclick="createTestUser()">+ Test-User anlegen</button>
+  </div>
+</div>
 
   <!-- TAB: Backup -->
   <div class="tab-panel" id="tab-backup">
@@ -2588,6 +2679,14 @@ let state = {
 function saveState() {
   localStorage.setItem('nlv6', JSON.stringify(state));
 }
+
+// SUCHE NACH: function saveState() {
+// ...am Ende der Funktion, vor der schließenden }:
+
+  // NEU: Bei jedem Speichern Score zu Firebase hochladen (wenn verfügbar)
+  if (typeof window.firebaseUploadScore === 'function') {
+    window.firebaseUploadScore(state).catch(e => console.warn('Firebase Upload:', e));
+  }
 
 function loadState() {
   // Kompatibilität: auch alten Key nlv5 prüfen
@@ -3294,8 +3393,8 @@ function applyPrestigeTheme(lvl) {
   document.documentElement.style.setProperty('--prestige-color', cfg.color);
   document.documentElement.style.setProperty('--prestige-glow',  cfg.glow);
 
-  // Rainbow-Klasse für Prestige 6+
-  document.documentElement.classList.toggle('prestige-rainbow', lvl >= 6);
+  // Rainbow-Klasse für Prestige 5+
+  document.documentElement.classList.toggle('prestige-rainbow', lvl >= 5);
 }
 
 function applyFontCombo(n, save = true) {
@@ -3638,13 +3737,29 @@ if (r.name === 'Verwaltungsmeisterin' || r.name === 'Verwaltungsmeiterin') displ
 function renderChallenges() {
   const today   = getTodayStr();
   const weekKey = getWeekKey();
+  
+  // NEU: Datumsformatierung — DIREKT AM ANFANG VON renderChallenges() einfügen
+
+  // Formatiert "2026-04-10" → "10.04.2026"
+  function formatDailyLabel(iso) {
+    const [y, m, d] = iso.split('-');
+    return `${d}.${m}.${y}`;
+  }
+
+  // Formatiert "2026-W15" → "KW15 2026"
+  function formatWeekLabel(wk) {
+    // wk = "2026-W15"
+    const match = wk.match(/^(\d{4})-W(\d+)$/);
+    if (!match) return wk;
+    return `KW${parseInt(match[2], 10)} ${match[1]}`;
+  }
 
   // ── Persönliche Daily ──────────────────────────────────
   const dailyIdx  = dateSeed(today)   % DAILY_CHALLENGES.length;
   const daily     = DAILY_CHALLENGES[dailyIdx];
   const dailyDone = !!state.dailyDone[today];
 
-  _setEl('dailyDateLabel', today);
+  _setEl('dailyDateLabel', formatDailyLabel(today));
   _setEl('dailyTitle',     daily.title);
   _setEl('dailyDesc',      daily.desc);
   _setEl('dailyXpLabel',   `+${DAILY_XP} XP`);
@@ -3658,7 +3773,7 @@ function renderChallenges() {
   const weekly     = WEEKLY_CHALLENGES[weeklyIdx];
   const weeklyDone = !!state.weeklyDone[weekKey];
 
-  _setEl('weekLabel',     weekKey);
+  _setEl('weekLabel', formatWeekLabel(weekKey));
   _setEl('weeklyTitle',   weekly.title);
   _setEl('weeklyDesc',    weekly.desc);
   _setEl('weeklyXpLabel', `+${WEEKLY_XP} XP + Abzeichen`);
@@ -3668,8 +3783,8 @@ function renderChallenges() {
   _toggleDoneArea('weeklyDoneArea', 'weeklyDoneMsg', weeklyDone);
 
   // ── Modul-Challenges Labels & Zähler ───────────────────
-  _setEl('modulDailyDateLabel', today);
-  _setEl('modulWeekLabel',      weekKey);
+  _setEl('modulDailyDateLabel', formatDailyLabel(today));
+  _setEl('modulWeekLabel', formatWeekLabel(weekKey));
   _updateModulCounter();
 }
 
@@ -4737,6 +4852,58 @@ function copyScore() {
     });
 }
 
+// NEU: Live-Bestenliste via Firebase — VOR function parseLeaderboard einfügen
+
+let _lbLiveData = [];
+let _lbLiveFilter = 'all';
+
+// Wird einmal beim App-Start aufgerufen
+function initLiveLeaderboard() {
+  if (typeof window.firebaseSubscribeLeaderboard !== 'function') return;
+  window.firebaseSubscribeLeaderboard(entries => {
+    _lbLiveData = entries;
+    renderLiveLeaderboard();
+  });
+}
+
+function filterLeaderboardLive(mod, btn) {
+  _lbLiveFilter = mod;
+  document.querySelectorAll('.lb-filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderLiveLeaderboard();
+}
+
+function renderLiveLeaderboard() {
+  const wrap = document.getElementById('lbTableWrap');
+  if (!wrap) return;
+  let data = _lbLiveData;
+  if (_lbLiveFilter !== 'all') data = data.filter(e => e.module === _lbLiveFilter);
+  if (data.length === 0) {
+    wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">Keine Einträge vorhanden.</p>';
+    return;
+  }
+  const isAdmin = state._isAdmin;
+  let html = `<table class="lb-table"><thead><tr>
+    <th>#</th><th></th><th>Name</th><th>Modul</th><th>XP</th><th>Abzeichen</th>${isAdmin ? '<th></th>' : ''}
+  </tr></thead><tbody>`;
+  data.forEach((e, i) => {
+    const isMe = e.name === state.name;
+    const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '';
+    const prestigeCfg = (window.getPrestigeConfig || (() => ({})))(e.prestige || 0);
+    html += `<tr${isMe ? ' class="me"' : ''}>
+      <td class="place">${medal || (i+1)}</td>
+      <td class="prestige-icon-col">${prestigeCfg?.icon || ''}</td>
+      <td><strong>${e.name}</strong></td>
+      <td style="font-size:0.8rem;color:var(--text-muted)">${e.module || '–'}</td>
+      <td><strong>${e.xp.toLocaleString('de-DE')}</strong></td>
+      <td>${e.badges || 0}</td>
+      ${isAdmin ? `<td><button class="lb-eye-btn" onclick="openAdminUserDetail(this)" data-entry='${JSON.stringify(e).replace(/'/g,"&#39;")}'>👁️</button></td>` : ''}
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
 function parseLeaderboard() {
   const raw = (document.getElementById('lbInput')?.value||'').trim();
   if (!raw) { showToast('⚠️ Bitte Inhalt von punkte.txt einfügen.'); return; }
@@ -4820,7 +4987,7 @@ function _renderLeaderboardTable(entries, isAdmin) {
       : ((e.isMe ? '👉 ' : '') + e.name);
     const piCell = e.prestige > 0 ? e.prestIcon : '–';
     const eyeCell = isAdmin
-      ? `<button class="lb-eye-btn" title="Details" onclick="openAdminUserDetail(this)" data-entry='${JSON.stringify(e).replace(/'/g,"&#39;")}'>👁️</button>`
+      ? `<button class="lb-eye-btn" title="Details" onclick="openUserDetailAny(this)" data-entry='${JSON.stringify(e).replace(/'/g,"&#39;")}'>👁️</button>`
       : '';
     return `<tr class="${e.isMe?'me':''}">
       <td class="place ${i<3?'place-'+(i+1):''}">${medals[i]||'#'+(i+1)}</td>
@@ -4889,6 +5056,75 @@ function showModuleStats() {
 /* ═══════════════════════════════════════════════════════════
    38. ADMIN USER DETAIL MODAL
    ═══════════════════════════════════════════════════════════ */
+
+// NEU: Spieler-Info für alle User (Standard-Ansicht) — VOR openAdminUserDetail einfügen
+function openUserDetailAny(btn) {
+  const isAdmin = state._isAdmin;
+  if (isAdmin) {
+    // Admin sieht die volle Ansicht
+    openAdminUserDetail(btn);
+    return;
+  }
+  // Standard-Ansicht für alle
+  let e;
+  try { e = JSON.parse(btn.dataset.entry.replace(/&#39;/g, "'")); } catch { return; }
+
+  const prestigeCfg = getPrestigeConfig(e.prestige || 0);
+  const html = `
+    <div style="text-align:center;padding:8px 0 16px">
+      <div style="font-size:3rem;margin-bottom:6px">${e.profilePic || '👤'}</div>
+      <div style="font-weight:800;font-size:1.1rem;color:var(--prestige-color)">${e.name}</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">${prestigeCfg?.label || ''}</div>
+    </div>
+
+    <!-- Vitrine: max. 3 Achievements -->
+    <div style="display:flex;gap:10px;justify-content:center;margin-bottom:18px" id="showcaseRow">
+      ${[0,1,2].map(i => {
+        const ach = (e.showcase || [])[i];
+        return `<div style="width:56px;height:56px;border-radius:12px;background:rgba(255,255,255,0.05);
+          border:1.5px solid ${ach ? 'var(--prestige-color)' : 'var(--card-border)'};
+          display:flex;align-items:center;justify-content:center;font-size:1.6rem" title="${ach?.name || 'Leer'}">
+          ${ach ? ach.emoji : '⭐'}
+        </div>`;
+      }).join('')}
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;font-size:0.84rem">
+      <div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.04);border-radius:8px">
+        <span style="color:var(--text-muted)">🏆 Rang</span>
+        <strong style="color:var(--prestige-color)">${e.rank || 1}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.04);border-radius:8px">
+        <span style="color:var(--text-muted)">⚡ XP</span>
+        <strong>${(e.xp||0).toLocaleString('de-DE')}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.04);border-radius:8px">
+        <span style="color:var(--text-muted)">🏅 Abzeichen</span>
+        <strong>${e.badges || 0}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:8px 12px;background:rgba(255,255,255,0.04);border-radius:8px">
+        <span style="color:var(--text-muted)">🏛️ Modul</span>
+        <strong>${e.module || '–'}</strong>
+      </div>
+    </div>
+  `;
+
+  // Einfaches Modal öffnen (nutzt das vorhandene info-modal-overlay)
+  const overlay = document.getElementById('infoModalOverlay') || (() => {
+    const o = document.createElement('div');
+    o.id = 'infoModalOverlay';
+    o.className = 'modal-overlay';
+    o.style.cssText = 'position:fixed;inset:0;z-index:9900;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)';
+    o.innerHTML = `<div class="info-modal" id="infoModalInner" style="max-width:380px;width:93%;max-height:85vh;overflow-y:auto"></div>`;
+    o.addEventListener('click', e => { if (e.target === o) o.remove(); });
+    document.body.appendChild(o);
+    return o;
+  })();
+  const inner = document.getElementById('infoModalInner');
+  if (inner) inner.innerHTML = html + `<div style="text-align:right;margin-top:16px"><button class="btn btn-ghost btn-sm" onclick="document.getElementById('infoModalOverlay').remove()">Schließen</button></div>`;
+  overlay.style.display = 'flex';
+}
+
 function openAdminUserDetail(btnEl) {
   let entry;
   try { entry = JSON.parse(btnEl.getAttribute('data-entry')); }
@@ -5038,6 +5274,10 @@ function openSettings() {
 
   // Abwesenheiten
   renderAbsences();
+  
+  // NEU: Benutzerverwaltungs-Tab ein-/ausblenden je nach Admin-Status
+const umBtn = document.getElementById('userMgmtTabBtn');
+if (umBtn) umBtn.style.display = state._isAdmin ? '' : 'none';
 }
 
 function saveSettings() {
@@ -5386,6 +5626,82 @@ function adminResetDailyChallenge() {
   showToast('🌅 Persönliche Daily zurückgesetzt.');
 }
 
+// NEU: Benutzerverwaltungs-Funktionen — VOR function adminResetWeeklyChallenge einfügen
+
+async function loadUserMgmtList() {
+  const wrap = document.getElementById('userMgmtList');
+  if (!wrap) return;
+  if (!window._db) {
+    wrap.innerHTML = '<p style="color:var(--error)">Firebase nicht verbunden.</p>';
+    return;
+  }
+  wrap.innerHTML = '<p style="color:var(--text-muted)">⏳ Lade…</p>';
+  try {
+    const snap = await window._firestoreGetDocs(window._firestoreCollection(window._db, 'leaderboard'));
+    if (snap.empty) { wrap.innerHTML = '<p style="color:var(--text-muted)">Keine Nutzer vorhanden.</p>'; return; }
+    let html = `<table class="lb-table"><thead><tr>
+      <th>Name</th><th>Modul</th><th>XP</th><th>Erster Login</th><th>Letzter Login</th><th></th>
+    </tr></thead><tbody>`;
+    snap.forEach(d => {
+      const e = d.data();
+      const first = e.firstLogin ? new Date(e.firstLogin).toLocaleDateString('de-DE') : '–';
+      const last  = e.updated   ? new Date(e.updated).toLocaleDateString('de-DE')    : '–';
+      html += `<tr>
+        <td><strong>${e.name}</strong></td>
+        <td>${e.module||'–'}</td>
+        <td>${(e.xp||0).toLocaleString('de-DE')}</td>
+        <td style="font-size:0.78rem;color:var(--text-muted)">${first}</td>
+        <td style="font-size:0.78rem;color:var(--text-muted)">${last}</td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteFirebaseUser('${e.name}')">🗑️</button></td>
+      </tr>`;
+    });
+    html += '</tbody></table>';
+    wrap.innerHTML = html;
+  } catch(err) {
+    wrap.innerHTML = `<p style="color:var(--error)">Fehler: ${err.message}</p>`;
+  }
+}
+
+async function deleteFirebaseUser(name) {
+  if (!confirm(`Nutzer "${name}" wirklich löschen?`)) return;
+  const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+  await deleteDoc(window._firestoreDoc(window._db, 'leaderboard', name));
+  showToast(`🗑️ ${name} gelöscht`);
+  loadUserMgmtList();
+}
+
+async function createTestUser() {
+  if (!window._db) { showToast('Firebase nicht verbunden', true); return; }
+  const name = document.getElementById('tuName')?.value.trim();
+  if (!name) { showToast('Name eingeben!', true); return; }
+  const data = {
+    name,
+    xp:       parseInt(document.getElementById('tuXP')?.value)       || 0,
+    rank:     parseInt(document.getElementById('tuRank')?.value)     || 1,
+    prestige: parseInt(document.getElementById('tuPrestige')?.value) || 0,
+    module:   document.getElementById('tuModule')?.value.trim()      || '–',
+    badges:   parseInt(document.getElementById('tuBadges')?.value)   || 0,
+    updated:  Date.now(),
+    firstLogin: Date.now(),
+    isTestUser: true
+  };
+  await window._firestoreDoc; // dummy
+  const { setDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
+  await setDoc(window._firestoreDoc(window._db, 'leaderboard', name), data);
+  showToast(`✅ Test-User "${name}" angelegt!`);
+  ['tuName','tuXP','tuRank','tuPrestige','tuModule','tuBadges'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.value = '';
+  });
+  loadUserMgmtList();
+}
+
+// NEU: Benutzerverwaltung beim Tab-Wechsel laden
+const _origSwitchTab = window.switchTab;
+window.switchTab = function(tab, btn) {
+  if (typeof _origSwitchTab === 'function') _origSwitchTab(tab, btn);
+  if (tab === 'usermgmt') loadUserMgmtList();
+};
+
 function adminResetWeeklyChallenge() {
   delete state.weeklyDone[getWeekKey()];
   saveState(); renderChallenges();
@@ -5426,6 +5742,7 @@ function adminResetBadge(name, xp) {
     state.totalXP = Math.max(0, (state.totalXP||0) - easterBadge.xp);
   }
   saveState(); render(); renderBadges(); showToast(`🗑️ „${name}" zurückgesetzt.`);
+  initLiveLeaderboard(); // NEU: Live-Bestenliste starten
 }
 
 /* ═══════════════════════════════════════════════════════════
