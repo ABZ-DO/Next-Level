@@ -5558,6 +5558,9 @@ function openAdminPanel() {
   // Streak + Activity Displays
   _setEl('adminStreakDisplay',   String(state.streakFactor   || 0));
   _setEl('adminActivityDisplay', String(state.activityPos || 20));
+  // NEU: Benutzerverwaltungs-Tab einblenden
+  const umBtn = document.getElementById('userMgmtTabBtn');
+  if (umBtn) umBtn.style.display = '';
 }
 
 function closeAdminPanel() {
@@ -5580,6 +5583,9 @@ document.getElementById('adminPanel')?.classList.remove('visible');
   if (_lbAllEntries.length > 0) {
     _renderLeaderboardTable(_lbAllEntries, false);
   }
+    // NEU: Benutzerverwaltungs-Tab ausblenden
+  const umBtn = document.getElementById('userMgmtTabBtn');
+  if (umBtn) umBtn.style.display = 'none';
 }
 
 function generateHash() {
