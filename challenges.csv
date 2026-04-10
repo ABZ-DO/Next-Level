@@ -1,22 +1,22 @@
 Bereich;Titel;Beschreibung;XP;Code;Badge_Emoji;Modul;Aktiv
 personal_daily;Hallo Tschüss!;Sage deinen Ausbilder*innen guten Morgen und verabschiede dich am Feierabend persönlich bei ihnen.;;;;; ja
 personal_daily;Stiftehalter;Räume deinen Stiftehalter auf und sortiere Stifte die nicht mehr schreiben aus.;;;;;; ja
-personal_daily;Fensterplatz;Öffne für 10 Minuten das Fenster, egal wie kalt es draußen ist.;;;;;; ja
-personal_weekly;Putzi Putzi;Wische mit einem feuchten Tuch über deinen Schreibtisch, Maus und Tastatur.;250;;🧹;; ja
+personal_daily;Fensterplatz;Öffne für 10 Minuten das Fenster egal wie kalt es draußen ist.;;;;;; ja
+personal_weekly;Putzi Putzi;Wische mit einem feuchten Tuch über deinen Schreibtisch Maus und Tastatur.;250;;🧹;; ja
 personal_weekly;Chaos-Killer;Räume deinen aktuellen Arbeitsplatz auf. Entferne Müll und sortiere deine Unterlagen.;250;;🗑️;; ja
-personal_weekly;Herzensmensch;Schreibe einer Person, die du magst, aber zu der du lange keinen Kontakt hattest, eine nette Nachricht.;250;;💌;; ja
+personal_weekly;Herzensmensch;Schreibe einer Person die du magst aber zu der du lange keinen Kontakt hattest eine nette Nachricht.;250;;💌;; ja
 modul_daily;Fachbegriff des Tages;Schlage heute einen Fachbegriff aus dem Bereich P&O nach und erkläre ihn deiner Sitznachbar*in.;75;POD-001;;Personal & Organisation;ja
 modul_daily;Formular-Check;Prüfe ein Formular aus deinem aktuellen Arbeitsbereich auf Vollständigkeit.;75;POD-002;;Personal & Organisation;ja
 modul_weekly;Organigramm zeichnen;Zeichne das Organigramm deiner Abteilung aus dem Gedächtnis und vergleiche es mit dem Original.;250;POW-001;;Personal & Organisation;ja
 modul_daily;Kontenrahmen;Benenne heute 5 Konten aus dem Kontenrahmen und erkläre ihre Funktion.;75;FD-001;;Finanzen;ja
 modul_daily;Buchungssatz;Erstelle einen vollständigen Buchungssatz zu einem echten Vorgang aus deinem Arbeitsalltag.;75;FD-002;;Finanzen;ja
 modul_weekly;Haushaltplan;Erkläre jemandem den Unterschied zwischen Verwaltungs- und Vermögenshaushalt.;250;FW-001;;Finanzen;ja
-modul_daily;Paragrafen-Jagd;Finde heute den passenden Paragrafen zu einer Frage, die dir in der Praxis begegnet ist.;75;ROD-001;;Recht & Ordnung;ja
+modul_daily;Paragrafen-Jagd;Finde heute den passenden Paragrafen zu einer Frage die dir in der Praxis begegnet ist.;75;ROD-001;;Recht & Ordnung;ja
 modul_daily;Bescheid lesen;Lies einen Verwaltungsbescheid und benenne die drei Pflichtbestandteile.;75;ROD-002;;Recht & Ordnung;ja
 modul_weekly;Widerspruch;Erkläre den Ablauf eines Widerspruchsverfahrens in eigenen Worten.;250;ROW-001;;Recht & Ordnung;ja
 modul_daily;Antrag prüfen;Prüfe heute einen Antrag auf Vollständigkeit und Anspruchsvoraussetzungen.;75;LVD-001;;Leistungsverwaltung;ja
 modul_daily;Bescheidkunde;Benenne alle Pflichtbestandteile eines Leistungsbescheids.;75;LVD-002;;Leistungsverwaltung;ja
 modul_weekly;Fallakte;Bearbeite einen vollständigen Leistungsfall von Antrag bis Bescheid.;250;LVW-001;;Leistungsverwaltung;ja
 modul_daily;Prompt des Tages;Schreibe heute einen nützlichen Prompt für eine KI zu einer Aufgabe aus deinem Alltag.;75;DD-001;;Digital;ja
-modul_daily;Tastenkürzel;Lerne heute 3 neue Tastenkürzel in einer Anwendung, die du täglich nutzt.;75;DD-002;;Digital;ja
-modul_weekly;Prozess digitalisieren;Beschreibe einen manuellen Arbeitsschritt aus deinem Alltag und skizziere, wie er digital abgebildet werden könnte.;250;DW-001;;Digital;ja
+modul_daily;Tastenkürzel;Lerne heute 3 neue Tastenkürzel in einer Anwendung die du täglich nutzt.;75;DD-002;;Digital;ja
+modul_weekly;Prozess digitalisieren;Beschreibe einen manuellen Arbeitsschritt aus deinem Alltag und skizziere wie er digital abgebildet werden könnte.;250;DW-001;;Digital;ja
