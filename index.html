@@ -1738,6 +1738,21 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
       <input type="text" class="field-input" id="settingsNameInput" placeholder="Neuen Nickname eingeben..." maxlength="32" style="margin-bottom:8px" />
     </div>
 
+<!-- NEU: Modul-Anzeige (statisch, nur lesen) -->
+    <div class="settings-section">
+      <div class="settings-section-title">🏛️ Dein Modul</div>
+      <div id="settingsModuleDisplay" style="
+        padding: 10px 14px;
+        background: rgba(255,255,255,0.04);
+        border: 1.5px solid var(--card-border);
+        border-radius: 10px;
+        font-size: 0.90rem;
+        font-weight: 700;
+        color: var(--prestige-color);
+        font-family: var(--font-main);
+      ">–</div>
+    </div>
+
     <!-- Anrede — ohne "(Standard)" -->
     <div class="settings-section">
       <div class="settings-section-title">🪪 Anrede (für Titel &amp; Ränge)</div>
@@ -4588,13 +4603,30 @@ spclEl.innerHTML = SPECIAL_BADGES.map(sb => {
       const name       = gender === 'female' ? (sb.nameFemale || sb.nameMale) : sb.nameMale;
       const isUnlocked = state.unlockedBadges.some(b => b.name === sb.nameMale || b.name === sb.nameFemale);
 
+// NEU: Sofort ab dem ersten Code sichtbar (nicht mehr versteckt)
       if (found === 0 && !isUnlocked) {
-        return `<div class="badge-wrap">
-          <div class="badge-card badge-locked" title="Noch nicht entdeckt">
+        const hasAnyCodes = (state.usedCodes || []).length > 0;
+        const nameShown = gender === 'female' ? (sb.nameFemale || sb.nameMale) : sb.nameMale;
+        if (!hasAnyCodes) {
+          // Noch kein einziger Code eingegeben → weiterhin versteckt
+          return `<div class="badge-wrap"><div class="badge-card badge-locked" title="Noch nicht entdeckt">
             <div class="badge-secret-icon">👁️</div>
             <div class="badge-name">???</div>
+          </div></div>`;
+        }
+        // Ab dem 1. Code: Abzeichen sichtbar, Fortschrittsbalken leer (0/5)
+        return `<div class="badge-wrap" style="min-width:110px">
+          <div class="badge-card badge-locked" style="padding:10px 7px 8px;filter:grayscale(70%)">
+            <span class="badge-emoji">${sb.emoji}</span>
+            <div class="badge-name">${nameShown}</div>
+            <div style="width:100%;margin-top:6px">
+              <div style="font-size:0.62rem;color:var(--text-muted);margin-bottom:3px;text-align:center">0/${sb.codes.length} Codes</div>
+              <div style="height:5px;border-radius:50px;background:rgba(255,255,255,0.08);overflow:hidden">
+                <div class="badge-progress-fill" style="width:0%"></div>
+              </div>
+            </div>
           </div>
-          <div class="badge-tooltip"><div class="badge-tooltip-name">???</div><div class="badge-tooltip-desc">???</div></div>
+          <div class="badge-tooltip"><div class="badge-tooltip-name">${nameShown}</div><div class="badge-tooltip-desc">${sb.desc}</div></div>
         </div>`;
       }
 
@@ -5248,9 +5280,9 @@ function openSettings() {
   const vEl = document.getElementById('settingsVersion');
   if (vEl && DEV_LOG.length) vEl.textContent = 'v' + DEV_LOG[DEV_LOG.length - 1].version;
 
-  // Aktuelle Werte laden
-  const ni = document.getElementById('settingsNameInput');
-  if (ni) ni.value = state.name || '';
+  // NEU: Modul anzeigen
+  const modEl = document.getElementById('settingsModuleDisplay');
+  if (modEl) modEl.textContent = state.module || '–';
 
   // Anrede
   selectGender(state.gender, false);
@@ -5642,71 +5674,73 @@ function adminResetDailyChallenge() {
 
 // NEU: Benutzerverwaltungs-Funktionen — VOR function adminResetWeeklyChallenge einfügen
 
+// NEUE VERSION — nutzt Compat-SDK
 async function loadUserMgmtList() {
   const wrap = document.getElementById('userMgmtList');
   if (!wrap) return;
-  if (!window._db) {
-    wrap.innerHTML = '<p style="color:var(--error)">Firebase nicht verbunden.</p>';
+  if (typeof window.firebaseGetAllUsers !== 'function') {
+    wrap.innerHTML = '<p style="color:var(--error);font-size:0.84rem">⚠️ Firebase nicht verbunden. Bitte Seite neu laden.</p>';
     return;
   }
-  wrap.innerHTML = '<p style="color:var(--text-muted)">⏳ Lade…</p>';
+  wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">⏳ Lade Nutzer…</p>';
   try {
-    const snap = await window._firestoreGetDocs(window._firestoreCollection(window._db, 'leaderboard'));
-    if (snap.empty) { wrap.innerHTML = '<p style="color:var(--text-muted)">Keine Nutzer vorhanden.</p>'; return; }
-    let html = `<table class="lb-table"><thead><tr>
+    const users = await window.firebaseGetAllUsers();
+    if (!users.length) { wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">Keine Nutzer vorhanden.</p>'; return; }
+    let html = `<div style="overflow-x:auto"><table class="lb-table" style="width:100%"><thead><tr>
       <th>Name</th><th>Modul</th><th>XP</th><th>Erster Login</th><th>Letzter Login</th><th></th>
     </tr></thead><tbody>`;
-    snap.forEach(d => {
-      const e = d.data();
+    users.sort((a,b) => (b.xp||0)-(a.xp||0)).forEach(e => {
       const first = e.firstLogin ? new Date(e.firstLogin).toLocaleDateString('de-DE') : '–';
       const last  = e.updated   ? new Date(e.updated).toLocaleDateString('de-DE')    : '–';
+      const isTest = e.isTestUser ? ' 🧪' : '';
       html += `<tr>
-        <td><strong>${e.name}</strong></td>
-        <td>${e.module||'–'}</td>
+        <td><strong>${e.name}${isTest}</strong></td>
+        <td style="font-size:0.8rem">${e.module||'–'}</td>
         <td>${(e.xp||0).toLocaleString('de-DE')}</td>
         <td style="font-size:0.78rem;color:var(--text-muted)">${first}</td>
         <td style="font-size:0.78rem;color:var(--text-muted)">${last}</td>
-        <td><button class="btn btn-danger btn-sm" onclick="deleteFirebaseUser('${e.name}')">🗑️</button></td>
+        <td><button class="btn btn-danger btn-sm" onclick="deleteFirebaseUser('${e.name.replace(/'/g,"\\'")}')">🗑️</button></td>
       </tr>`;
     });
-    html += '</tbody></table>';
+    html += '</tbody></table></div>';
     wrap.innerHTML = html;
   } catch(err) {
-    wrap.innerHTML = `<p style="color:var(--error)">Fehler: ${err.message}</p>`;
+    wrap.innerHTML = `<p style="color:var(--error);font-size:0.84rem">Fehler: ${err.message}</p>`;
   }
 }
 
 async function deleteFirebaseUser(name) {
   if (!confirm(`Nutzer "${name}" wirklich löschen?`)) return;
-  const { deleteDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-  await deleteDoc(window._firestoreDoc(window._db, 'leaderboard', name));
-  showToast(`🗑️ ${name} gelöscht`);
-  loadUserMgmtList();
+  try {
+    await window.firebaseDeleteUser(name);
+    showToast(`🗑️ ${name} gelöscht`);
+    loadUserMgmtList();
+  } catch(e) { showToast('⚠️ Löschen fehlgeschlagen'); }
 }
 
 async function createTestUser() {
-  if (!window._db) { showToast('Firebase nicht verbunden', true); return; }
+  if (typeof window.firebaseCreateTestUser !== 'function') { showToast('⚠️ Firebase nicht verbunden'); return; }
   const name = document.getElementById('tuName')?.value.trim();
-  if (!name) { showToast('Name eingeben!', true); return; }
+  if (!name) { showToast('⚠️ Bitte Name eingeben!'); return; }
   const data = {
     name,
-    xp:       parseInt(document.getElementById('tuXP')?.value)       || 0,
-    rank:     parseInt(document.getElementById('tuRank')?.value)     || 1,
-    prestige: parseInt(document.getElementById('tuPrestige')?.value) || 0,
-    module:   document.getElementById('tuModule')?.value.trim()      || '–',
-    badges:   parseInt(document.getElementById('tuBadges')?.value)   || 0,
-    updated:  Date.now(),
+    xp:        parseInt(document.getElementById('tuXP')?.value)       || 0,
+    rank:      parseInt(document.getElementById('tuRank')?.value)      || 1,
+    prestige:  parseInt(document.getElementById('tuPrestige')?.value)  || 0,
+    module:    document.getElementById('tuModule')?.value.trim()       || '–',
+    badges:    parseInt(document.getElementById('tuBadges')?.value)    || 0,
     firstLogin: Date.now(),
+    updated:    Date.now(),
     isTestUser: true
   };
-  await window._firestoreDoc; // dummy
-  const { setDoc } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
-  await setDoc(window._firestoreDoc(window._db, 'leaderboard', name), data);
-  showToast(`✅ Test-User "${name}" angelegt!`);
-  ['tuName','tuXP','tuRank','tuPrestige','tuModule','tuBadges'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.value = '';
-  });
-  loadUserMgmtList();
+  try {
+    await window.firebaseCreateTestUser(data);
+    showToast(`✅ Test-User "${name}" angelegt!`);
+    ['tuName','tuXP','tuRank','tuPrestige','tuModule','tuBadges'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    loadUserMgmtList();
+  } catch(e) { showToast('⚠️ Fehler beim Anlegen'); }
 }
 
 // NEU: Benutzerverwaltung beim Tab-Wechsel laden
