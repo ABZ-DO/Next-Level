@@ -2335,24 +2335,72 @@ window.firebaseCreateTestUser = async function(data) {
   <div class="tile-title"><span class="icon">👥</span> Benutzerverwaltung</div>
 
   <!-- Liste aller User -->
-  <div style="margin-bottom:16px">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
     <button class="btn btn-ghost btn-sm" onclick="loadUserMgmtList()">🔄 Aktualisieren</button>
+    <span id="userMgmtCount" style="font-size:0.78rem;color:var(--text-muted)"></span>
   </div>
   <div id="userMgmtList"><p style="color:var(--text-muted);font-size:0.84rem">⏳ Lade Nutzer…</p></div>
 
   <div class="divider"></div>
 
   <!-- Test-User erstellen -->
-  <div class="tile-title" style="font-size:0.95rem;margin-bottom:12px"><span class="icon">🧪</span> Test-User erstellen</div>
-  <div style="display:flex;flex-direction:column;gap:8px">
-    <input class="field-input" id="tuName"     placeholder="Name"           style="margin:0" />
-    <input class="field-input" id="tuXP"       placeholder="XP (z.B. 1500)" type="number" style="margin:0" />
-    <input class="field-input" id="tuRank"     placeholder="Rang (1–25)"    type="number" style="margin:0" />
-    <input class="field-input" id="tuPrestige" placeholder="Prestige (0–5)" type="number" style="margin:0" />
-    <input class="field-input" id="tuModule"   placeholder="Modul (P&O, F, R&O, LV, D)" style="margin:0" />
-    <input class="field-input" id="tuBadges"   placeholder="Anzahl Abzeichen" type="number" style="margin:0" />
-    <button class="btn btn-gold btn-sm" onclick="createTestUser()">+ Test-User anlegen</button>
+  <div class="tile-title" style="font-size:0.95rem;margin-bottom:4px"><span class="icon">🧪</span> Test-User erstellen</div>
+  <p style="color:var(--text-muted);font-size:0.78rem;margin-bottom:12px">Dummy-Profile für Demo-Zwecke. Werden in der Bestenliste mit 🧪 markiert.</p>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+    <div>
+      <label style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:3px">👤 Name *</label>
+      <input class="field-input" id="tuName" placeholder="z.B. Max Mustermann" style="margin:0" />
+    </div>
+    <div>
+      <label style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:3px">🏛️ Modul</label>
+      <select id="tuModule" style="width:100%;padding:10px 12px;background:var(--navy);border:1.5px solid var(--slate);border-radius:10px;color:var(--cream);font-family:var(--font-main);font-size:0.86rem;outline:none">
+        <option value="P&O">P&amp;O</option>
+        <option value="F">Finanzen</option>
+        <option value="R&O">R&amp;O</option>
+        <option value="LV">Leistungsverwaltung</option>
+        <option value="D">Digital</option>
+      </select>
+    </div>
+    <div>
+      <label style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:3px">⚡ XP</label>
+      <input class="field-input" id="tuXP" placeholder="z.B. 1500" type="number" min="0" style="margin:0" />
+    </div>
+    <div>
+      <label style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:3px">✨ Prestige (0–5)</label>
+      <input class="field-input" id="tuPrestige" placeholder="0" type="number" min="0" max="5" style="margin:0" />
+    </div>
+    <div>
+      <label style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:3px">🏅 Anzahl Abzeichen</label>
+      <input class="field-input" id="tuBadges" placeholder="z.B. 5" type="number" min="0" style="margin:0" />
+    </div>
+    <div>
+      <label style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:3px">🏆 Anzahl Achievements</label>
+      <input class="field-input" id="tuAchievements" placeholder="z.B. 3" type="number" min="0" style="margin:0" />
+    </div>
   </div>
+
+  <div style="margin-bottom:8px">
+    <label style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:3px">🖼️ Profilbild (Emoji, z.B. 🦊)</label>
+    <input class="field-input" id="tuProfilePic" placeholder="🦊" maxlength="4" style="margin:0" />
+  </div>
+
+  <div style="margin-bottom:12px">
+    <label style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em;display:block;margin-bottom:6px">⭐ Vitrine (bis zu 3 Achievements auswählen)</label>
+    <div id="tuShowcaseWrap" style="display:flex;flex-direction:column;gap:5px">
+      <select id="tuVitrine1" style="width:100%;padding:8px 10px;background:var(--navy);border:1.5px solid var(--slate);border-radius:8px;color:var(--cream);font-family:var(--font-main);font-size:0.82rem;outline:none">
+        <option value="">— Vitrine Slot 1 (leer) —</option>
+      </select>
+      <select id="tuVitrine2" style="width:100%;padding:8px 10px;background:var(--navy);border:1.5px solid var(--slate);border-radius:8px;color:var(--cream);font-family:var(--font-main);font-size:0.82rem;outline:none">
+        <option value="">— Vitrine Slot 2 (leer) —</option>
+      </select>
+      <select id="tuVitrine3" style="width:100%;padding:8px 10px;background:var(--navy);border:1.5px solid var(--slate);border-radius:8px;color:var(--cream);font-family:var(--font-main);font-size:0.82rem;outline:none">
+        <option value="">— Vitrine Slot 3 (leer) —</option>
+      </select>
+    </div>
+  </div>
+
+  <button class="btn btn-gold btn-sm" onclick="createTestUser()" style="width:100%">🧪 Test-User anlegen</button>
 </div>
 
   <!-- TAB: Backup -->
@@ -5858,12 +5906,138 @@ function adminResetDailyChallenge() {
 
 // NEUE VERSION — nutzt Compat-SDK
 async function loadUserMgmtList() {
-  const wrap = document.getElementById('userMgmtList');
+  const wrap  = document.getElementById('userMgmtList');
+  const count = document.getElementById('userMgmtCount');
   if (!wrap) return;
   if (typeof window.firebaseGetAllUsers !== 'function') {
     wrap.innerHTML = '<p style="color:var(--error);font-size:0.84rem">⚠️ Firebase nicht verbunden. Bitte Seite neu laden.</p>';
     return;
   }
+  wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">⏳ Lade Nutzer…</p>';
+  try {
+    const users = await window.firebaseGetAllUsers();
+    if (!users.length) {
+      wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">Keine Nutzer vorhanden.</p>';
+      if (count) count.textContent = '';
+      return;
+    }
+    if (count) count.textContent = `${users.length} Nutzer`;
+
+    const sorted = [...users].sort((a,b) => (b.xp||0) - (a.xp||0));
+    let html = `<div style="overflow-x:auto">
+      <table class="lb-table" style="width:100%;font-size:0.82rem">
+        <thead><tr>
+          <th style="text-align:left">👤 Name</th>
+          <th>🏛️</th>
+          <th>⚡ XP</th>
+          <th>🏅</th>
+          <th>📅 Erster Login</th>
+          <th>🕐 Letzter Login</th>
+          <th></th>
+        </tr></thead><tbody>`;
+
+    sorted.forEach(e => {
+      const first  = e.firstLogin ? new Date(e.firstLogin).toLocaleDateString('de-DE') : '–';
+      const last   = e.updated   ? new Date(e.updated).toLocaleDateString('de-DE')    : '–';
+      const isTest = e.isTestUser ? ' <span style="color:var(--warning);font-size:0.72rem">🧪</span>' : '';
+      const safeName = (e.name||'').replace(/'/g,"\\'");
+      html += `<tr>
+        <td style="text-align:left"><strong>${e.name||'?'}${isTest}</strong>
+          <div style="font-size:0.72rem;color:var(--text-muted)">${e.rank||'–'}</div></td>
+        <td>${e.module||'–'}</td>
+        <td><strong>${(e.xp||0).toLocaleString('de-DE')}</strong></td>
+        <td>${e.badges||0}</td>
+        <td style="color:var(--text-muted)">${first}</td>
+        <td style="color:var(--text-muted)">${last}</td>
+        <td><button class="btn btn-danger btn-sm" style="padding:3px 8px;font-size:0.72rem"
+            onclick="deleteFirebaseUser('${safeName}')">🗑️</button></td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+    wrap.innerHTML = html;
+
+    // Vitrine-Dropdowns mit Achievements befüllen
+    _fillVitrineDropdowns();
+  } catch(err) {
+    wrap.innerHTML = `<p style="color:var(--error);font-size:0.84rem">❌ Fehler: ${err.message}</p>`;
+  }
+}
+
+function _fillVitrineDropdowns() {
+  const opts = ACHIEVEMENTS
+    .map(a => `<option value="${a.id}">${a.emoji} ${a.name}</option>`)
+    .join('');
+  ['tuVitrine1','tuVitrine2','tuVitrine3'].forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = `<option value="">— leer —</option>` + opts;
+  });
+}
+
+async function deleteFirebaseUser(name) {
+  if (!confirm(`Nutzer "${name}" wirklich löschen?`)) return;
+  try {
+    await window.firebaseDeleteUser(name);
+    showToast(`🗑️ ${name} gelöscht`);
+    loadUserMgmtList();
+  } catch(e) { showToast('⚠️ Löschen fehlgeschlagen'); }
+}
+
+async function createTestUser() {
+  if (typeof window.firebaseCreateTestUser !== 'function') { showToast('⚠️ Firebase nicht verbunden'); return; }
+  const name = (document.getElementById('tuName')?.value || '').trim();
+  if (!name) { showToast('⚠️ Bitte Name eingeben!'); return; }
+
+  // Vitrine zusammenbauen
+  const showcase = ['tuVitrine1','tuVitrine2','tuVitrine3'].map(id => {
+    const val = document.getElementById(id)?.value;
+    if (!val) return null;
+    const a = ACHIEVEMENTS.find(x => x.id === val);
+    return a ? { id: a.id, emoji: a.emoji, name: a.name } : null;
+  }).filter(Boolean);
+
+  // Profilbild: Emoji oder leer
+  const picRaw = (document.getElementById('tuProfilePic')?.value || '').trim();
+
+  // Rang aus XP berechnen
+  const xp = parseInt(document.getElementById('tuXP')?.value) || 0;
+  const rankArr = RANKS_FEMALE;
+  let rankName = rankArr[0].name;
+  for (const r of rankArr) { if (xp >= r.xp) rankName = r.name; }
+
+  const prestige = Math.min(5, Math.max(0, parseInt(document.getElementById('tuPrestige')?.value) || 0));
+  const prestIcon = (typeof PRESTIGE_CONFIG !== 'undefined') ? (PRESTIGE_CONFIG[prestige]?.icon || '') : '';
+
+  const data = {
+    name,
+    xp,
+    prestige,
+    rank:         rankName,
+    prestIcon,
+    module:       document.getElementById('tuModule')?.value || 'P&O',
+    badges:       parseInt(document.getElementById('tuBadges')?.value)       || 0,
+    achievements: parseInt(document.getElementById('tuAchievements')?.value) || 0,
+    profilePic:   picRaw,
+    showcase,
+    gender:       'female',
+    firstLogin:   Date.now(),
+    updated:      Date.now(),
+    isTestUser:   true,
+  };
+
+  try {
+    await window.firebaseCreateTestUser(data);
+    showToast(`✅ Test-User „${name}" angelegt!`);
+    // Felder leeren
+    ['tuName','tuXP','tuPrestige','tuBadges','tuAchievements','tuProfilePic'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    ['tuVitrine1','tuVitrine2','tuVitrine3'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.value = '';
+    });
+    loadUserMgmtList();
+  } catch(e) { showToast('⚠️ Fehler beim Anlegen: ' + e.message); }
+}
   wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">⏳ Lade Nutzer…</p>';
   try {
     const users = await window.firebaseGetAllUsers();
