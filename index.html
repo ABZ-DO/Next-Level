@@ -1179,67 +1179,6 @@ function _fbKey(name) {
   return name.replace(/[.#$\[\]\/]/g, '_');
 }
 
-/** Bei jedem saveState(): Eigene Daten in RTDB hochladen */
-window.firebaseUploadScore = async function(st) {
-  if (!st.name) return;
-  try {
-    const rankName = (typeof getCurrentRank === 'function') ? getCurrentRank().name : '';
-    const modAbbr  = (typeof getModuleAbbr  === 'function') ? getModuleAbbr(st.module) : (st.module || '–');
-    // Vitrine: IDs → Objekte mit Emoji
-    const showcaseObjs = (st.showcase || []).map(id => {
-      const a = (typeof ACHIEVEMENTS !== 'undefined') ? ACHIEVEMENTS.find(x => x.id === id) : null;
-      return a ? { id, emoji: a.emoji, name: a.name } : null;
-    }).filter(Boolean);
-    await _db.ref('leaderboard/' + _fbKey(st.name)).update({
-      name:       st.name,
-      xp:         st.xp                         || 0,
-      prestige:   st.prestige                   || 0,
-      rank:       rankName,
-      module:     modAbbr,
-      badges:     (st.unlockedBadges || []).length,
-      gender:     st.gender                     || 'female',
-      profilePic: st.profilePic                 || '',
-      showcase:   showcaseObjs,
-      firstLogin: st.firstOpenTs                || Date.now(),
-      updated:    Date.now(),
-    });
-  } catch(e) { console.warn('Firebase Upload Fehler:', e); }
-};
-
-/** Live-Listener: Bestenliste in Echtzeit empfangen */
-window.firebaseSubscribeLeaderboard = function(callback) {
-  _db.ref('leaderboard').on('value', snap => {
-    const entries = [];
-    snap.forEach(child => entries.push(child.val()));
-    entries.sort((a, b) => (b.xp || 0) - (a.xp || 0));
-    callback(entries);
-  }, err => console.warn('Firebase Listener Fehler:', err));
-};
-
-/** Admin: Alle User aus RTDB laden */
-window.firebaseGetAllUsers = async function() {
-  const snap = await _db.ref('leaderboard').once('value');
-  const users = [];
-  snap.forEach(child => users.push(child.val()));
-  return users;
-};
-
-/** Admin: User aus RTDB löschen */
-window.firebaseDeleteUser = async function(name) {
-  await _db.ref('leaderboard/' + _fbKey(name)).remove();
-};
-
-/** Admin: Test-User in RTDB anlegen */
-window.firebaseCreateTestUser = async function(data) {
-  await _db.ref('leaderboard/' + _fbKey(data.name)).set({
-    ...data,
-    updated:    Date.now(),
-    firstLogin: data.firstLogin || Date.now(),
-    isTestUser: true,
-  });
-};
-</script>
-
 </head>
 <body>
 
