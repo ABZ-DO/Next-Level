@@ -6036,67 +6036,7 @@ async function createTestUser() {
       const el = document.getElementById(id); if (el) el.value = '';
     });
     loadUserMgmtList();
-  } catch(e) { showToast('⚠️ Fehler beim Anlegen: ' + e.message); }
-}
-  wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">⏳ Lade Nutzer…</p>';
-  try {
-    const users = await window.firebaseGetAllUsers();
-    if (!users.length) { wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">Keine Nutzer vorhanden.</p>'; return; }
-    let html = `<div style="overflow-x:auto"><table class="lb-table" style="width:100%"><thead><tr>
-      <th>Name</th><th>Modul</th><th>XP</th><th>Erster Login</th><th>Letzter Login</th><th></th>
-    </tr></thead><tbody>`;
-    users.sort((a,b) => (b.xp||0)-(a.xp||0)).forEach(e => {
-      const first = e.firstLogin ? new Date(e.firstLogin).toLocaleDateString('de-DE') : '–';
-      const last  = e.updated   ? new Date(e.updated).toLocaleDateString('de-DE')    : '–';
-      const isTest = e.isTestUser ? ' 🧪' : '';
-      html += `<tr>
-        <td><strong>${e.name}${isTest}</strong></td>
-        <td style="font-size:0.8rem">${e.module||'–'}</td>
-        <td>${(e.xp||0).toLocaleString('de-DE')}</td>
-        <td style="font-size:0.78rem;color:var(--text-muted)">${first}</td>
-        <td style="font-size:0.78rem;color:var(--text-muted)">${last}</td>
-        <td><button class="btn btn-danger btn-sm" onclick="deleteFirebaseUser('${e.name.replace(/'/g,"\\'")}')">🗑️</button></td>
-      </tr>`;
-    });
-    html += '</tbody></table></div>';
-    wrap.innerHTML = html;
-  } catch(err) {
-    wrap.innerHTML = `<p style="color:var(--error);font-size:0.84rem">Fehler: ${err.message}</p>`;
-  }
-}
-
-async function deleteFirebaseUser(name) {
-  if (!confirm(`Nutzer "${name}" wirklich löschen?`)) return;
-  try {
-    await window.firebaseDeleteUser(name);
-    showToast(`🗑️ ${name} gelöscht`);
-    loadUserMgmtList();
-  } catch(e) { showToast('⚠️ Löschen fehlgeschlagen'); }
-}
-
-async function createTestUser() {
-  if (typeof window.firebaseCreateTestUser !== 'function') { showToast('⚠️ Firebase nicht verbunden'); return; }
-  const name = document.getElementById('tuName')?.value.trim();
-  if (!name) { showToast('⚠️ Bitte Name eingeben!'); return; }
-  const data = {
-    name,
-    xp:        parseInt(document.getElementById('tuXP')?.value)       || 0,
-    rank:      parseInt(document.getElementById('tuRank')?.value)      || 1,
-    prestige:  parseInt(document.getElementById('tuPrestige')?.value)  || 0,
-    module:    document.getElementById('tuModule')?.value.trim()       || '–',
-    badges:    parseInt(document.getElementById('tuBadges')?.value)    || 0,
-    firstLogin: Date.now(),
-    updated:    Date.now(),
-    isTestUser: true
-  };
-  try {
-    await window.firebaseCreateTestUser(data);
-    showToast(`✅ Test-User "${name}" angelegt!`);
-    ['tuName','tuXP','tuRank','tuPrestige','tuModule','tuBadges'].forEach(id => {
-      const el = document.getElementById(id); if (el) el.value = '';
-    });
-    loadUserMgmtList();
-  } catch(e) { showToast('⚠️ Fehler beim Anlegen'); }
+} catch(e) { showToast('⚠️ Fehler beim Anlegen: ' + e.message); }
 }
 
 // NEU: Benutzerverwaltung beim Tab-Wechsel laden
