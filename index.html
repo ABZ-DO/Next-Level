@@ -1299,6 +1299,29 @@ window.firebaseDeleteUser = async function(name) {
   await _db.ref('leaderboard/' + _fbKey(name)).remove();
 };
 
+/** Admin: User auf Inaktiv setzen (archiviert + aus Bestenliste entfernt) */
+window.firebaseSetInactive = async function(name) {
+  const snap = await _db.ref('leaderboard/' + _fbKey(name)).once('value');
+  const data = snap.val();
+  if (!data) throw new Error('User nicht gefunden');
+  // In Archiv speichern
+  await _db.ref('archiv/' + _fbKey(name)).set({
+    ...data,
+    isInactive:   true,
+    inactiveSince: Date.now(),
+  });
+  // Aus aktiver Bestenliste entfernen
+  await _db.ref('leaderboard/' + _fbKey(name)).remove();
+};
+
+/** Admin: Alle Archiv-User laden */
+window.firebaseGetArchivUsers = async function() {
+  const snap = await _db.ref('archiv').once('value');
+  const users = [];
+  snap.forEach(child => { const v = child.val(); if (v && v.name) users.push(v); });
+  return users;
+};
+
 /** Admin: Test-User in RTDB anlegen */
 window.firebaseCreateTestUser = async function(data) {
   await _db.ref('leaderboard/' + _fbKey(data.name)).set({
@@ -2413,6 +2436,13 @@ window.firebaseCreateTestUser = async function(data) {
   </div>
   <div id="userMgmtList"><p style="color:var(--text-muted);font-size:0.84rem">⏳ Lade Nutzer…</p></div>
 
+<div class="divider"></div>
+
+  <!-- Archiv inaktiver User -->
+  <div class="tile-title" style="font-size:0.95rem;margin-bottom:8px"><span class="icon">📦</span> Archiv — Inaktive User</div>
+  <p style="color:var(--text-muted);font-size:0.78rem;margin-bottom:10px">Ehemalige Azubis, nach Gesamt-XP sortiert. Können nicht mehr spielen.</p>
+  <div id="archivList"><p style="color:var(--text-muted);font-size:0.84rem">⏳ Lade Archiv…</p></div>
+
   <div class="divider"></div>
 
   <!-- Test-User erstellen -->
@@ -2945,8 +2975,22 @@ function init() {
     // Offene Klick-Statistik aktualisieren
     state.totalOpenCount = (state.totalOpenCount || 1);
     saveState();
-    processHistory();
+processHistory();
     render();
+    // Prüfen ob User inaktiv gesetzt wurde
+    if (typeof window.firebaseGetArchivUsers === 'function' && state.name) {
+      window.firebaseGetArchivUsers().then(archiv => {
+        if (archiv.some(u => u.name === state.name)) {
+          document.body.innerHTML = `<div style="position:fixed;inset:0;background:#0f1e3c;display:flex;align-items:center;justify-content:center;font-family:'Plus Jakarta Sans',sans-serif">
+            <div style="text-align:center;padding:40px;max-width:400px">
+              <div style="font-size:4rem;margin-bottom:20px">😊</div>
+              <h2 style="color:#c9a84c;font-size:1.5rem;margin-bottom:16px;font-family:'Playfair Display',serif">Deine Zeit im ABZ ist abgelaufen.</h2>
+              <p style="color:#8a9abf;line-height:1.7;font-size:0.95rem">Wir hoffen du hattest Spaß mit deiner Next Level Experience! 😊<br><br>Deine Leistungen sind für immer im Archiv festgehalten.</p>
+            </div>
+          </div>`;
+        }
+      }).catch(() => {});
+    }
 // Alle Challenges aus GitHub CSV laden (Persönlich + Modul)
     syncChallengesFromSheets();
     // NEU: Live-Bestenliste starten
@@ -4693,7 +4737,7 @@ function sortBadges(arr) {
             <span class="badge-cookie-mini">${b.emoji}</span>
             <span class="badge-cookie-mini">${b.emoji}</span>
           </div>
-          <div class="badge-name">${b.name}</div>${rarityPill}
+badge-name">${getGenderedBadgeName(b.name, state.gender)}</div>
         </div>
         <div class="badge-tooltip">
           <div class="badge-tooltip-name">${b.name}</div>
@@ -4704,7 +4748,7 @@ function sortBadges(arr) {
     return `<div class="badge-wrap">
       <div class="badge-card ${lockedClass}${adminClass}" ${adminClick}>
         <span class="badge-emoji">${b.emoji}</span>
-        <div class="badge-name">${b.name}</div>${rarityPill}
+badge-name">${getGenderedBadgeName(b.name, state.gender)}</div>
       </div>
       <div class="badge-tooltip">
         <div class="badge-tooltip-name">${b.name}</div>
@@ -4783,18 +4827,9 @@ spclEl.innerHTML = SPECIAL_BADGES.map(sb => {
       const name       = gender === 'female' ? (sb.nameFemale || sb.nameMale) : sb.nameMale;
       const isUnlocked = state.unlockedBadges.some(b => b.name === sb.nameMale || b.name === sb.nameFemale);
 
-// NEU: Sofort ab dem ersten Code sichtbar (nicht mehr versteckt)
+// Immer sichtbar — ab 0 Codes schon mit leerem Balken
       if (found === 0 && !isUnlocked) {
-        const hasAnyCodes = (state.usedCodes || []).length > 0;
         const nameShown = gender === 'female' ? (sb.nameFemale || sb.nameMale) : sb.nameMale;
-        if (!hasAnyCodes) {
-          // Noch kein einziger Code eingegeben → weiterhin versteckt
-          return `<div class="badge-wrap"><div class="badge-card badge-locked" title="Noch nicht entdeckt">
-            <div class="badge-secret-icon">👁️</div>
-            <div class="badge-name">???</div>
-          </div></div>`;
-        }
-        // Ab dem 1. Code: Abzeichen sichtbar, Fortschrittsbalken leer (0/5)
         return `<div class="badge-wrap" style="min-width:110px">
           <div class="badge-card badge-locked" style="padding:10px 7px 8px;filter:grayscale(70%)">
             <span class="badge-emoji">${sb.emoji}</span>
@@ -4845,6 +4880,17 @@ spclEl.innerHTML = SPECIAL_BADGES.map(sb => {
 /* ═══════════════════════════════════════════════════════════
    34. ACHIEVEMENT-GALERIE RENDERN
    ═══════════════════════════════════════════════════════════ */
+/** Gendered Badge-Name aus "Name/Suffix"-Format */
+function getGenderedBadgeName(name, gender) {
+  if (!name) return name;
+  if (!name.includes('/')) return name;
+  const slash     = name.lastIndexOf('/');
+  const base      = name.slice(0, slash);
+  const femSuffix = name.slice(slash + 1);
+  if (gender !== 'female') return base;
+  // Sonderfälle: "meister/in" → "meisterin", "Vizemeister/in" → "Vizemeisterin"
+  return base + femSuffix;
+}
 function getGenderedAchName(name, gender) {
   if (!name.includes('/')) return name;
   const slash     = name.lastIndexOf('/');
@@ -5173,10 +5219,11 @@ data.forEach((e, i) => {
     const prestigeIcon = (e.prestige > 0)
       ? ((window.getPrestigeConfig || (() => ({})))(e.prestige)?.icon || '') : '';
     const safeEntry = JSON.stringify(e).replace(/'/g,"&#39;");
+const titlePrefix = e.activeTitle ? `<span style="font-size:0.70rem;color:var(--text-muted);display:block;line-height:1.2">${e.activeTitle}</span>` : '';
     html += `<tr${isMe ? ' class="me"' : ''}>
       <td class="place">${medal || (i+1)}</td>
       <td class="prestige-icon-col">${prestigeIcon}</td>
-      <td><strong>${e.name}</strong></td>
+      <td>${titlePrefix}<strong>${e.name}</strong></td>
       <td style="font-size:0.8rem;color:var(--text-muted)">${e.module || '–'}</td>
       <td><strong>${(e.xp||0).toLocaleString('de-DE')}</strong></td>
       <td>${e.badges || 0}</td>
@@ -5462,7 +5509,8 @@ function openUserDetailLive(btn) {
       ${row('Gesamt Check-ins', e.officeMapTotal||0)}
     </div>`;
 
-  // Admin-Sektionen
+// Admin-Sektionen
+  window._dlStore = [];  // Store VOR dem Aufbau der Admin-HTML leeren
   if (isAdmin) {
     // Listen-Button-Hilfsfunktion
     const listBtn = (label, items, emoji) => {
@@ -5528,7 +5576,6 @@ function openUserDetailLive(btn) {
   }
 
   // Modal öffnen
-  window._dlStore = [];  // Store bei jedem Öffnen zurücksetzen
   let overlay = document.getElementById('infoModalOverlay');
   if (!overlay) {
     overlay = document.createElement('div');
@@ -5547,29 +5594,6 @@ function openUserDetailLive(btn) {
         onclick="document.getElementById('infoModalOverlay').remove()">Schließen</button></div>`;
 }
 
-/** Hilfsfunktion: Admin-Detail-Listen in Mini-Overlay */
-function _showDetailList(itemsJson, title) {
-  const items = typeof itemsJson === 'string' ? JSON.parse(itemsJson) : itemsJson;
-  const ex = document.getElementById('_detailListOverlay');
-  if (ex) ex.remove();
-  const ov = document.createElement('div');
-  ov.id = '_detailListOverlay';
-  ov.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
-  ov.innerHTML = `<div style="background:var(--navy-light);border:1px solid var(--card-border);
-    border-radius:16px;padding:18px;max-width:340px;width:92%;max-height:70vh;overflow-y:auto;box-shadow:var(--shadow)">
-    <div style="font-weight:800;color:var(--prestige-color);margin-bottom:10px;font-size:0.9rem">${title} (${items.length})</div>
-    ${items.length
-      ? `<div style="display:flex;flex-direction:column;gap:4px">
-          ${items.map(it=>`<div style="padding:5px 9px;background:rgba(255,255,255,0.04);border-radius:7px;font-size:0.81rem">${it}</div>`).join('')}
-        </div>`
-      : `<div style="color:var(--text-muted);font-size:0.82rem">Keine Einträge.</div>`}
-    <div style="text-align:right;margin-top:12px">
-      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('_detailListOverlay').remove()">← Zurück</button>
-    </div>
-  </div>`;
-  ov.addEventListener('click', ev => { if(ev.target===ov) ov.remove(); });
-  document.body.appendChild(ov);
-}
 // NEU: Spieler-Info für alle User (Standard-Ansicht) — VOR openAdminUserDetail einfügen
 function openUserDetailAny(btn) {
   const isAdmin = state._isAdmin;
@@ -6193,15 +6217,21 @@ async function loadUserMgmtList() {
         <td>${e.badges||0}</td>
         <td style="color:var(--text-muted)">${first}</td>
         <td style="color:var(--text-muted)">${last}</td>
-        <td><button class="btn btn-danger btn-sm" style="padding:3px 8px;font-size:0.72rem"
-            onclick="deleteFirebaseUser('${safeName}')">🗑️</button></td>
+<td style="display:flex;gap:4px">
+          <button class="btn btn-sm" style="padding:3px 7px;font-size:0.70rem;background:rgba(245,158,11,0.15);border:1.5px solid var(--warning);color:var(--warning)"
+              onclick="setInactiveUser('${safeName}')">📦</button>
+          <button class="btn btn-danger btn-sm" style="padding:3px 8px;font-size:0.72rem"
+              onclick="deleteFirebaseUser('${safeName}')">🗑️</button>
+        </td>
       </tr>`;
     });
     html += '</tbody></table></div>';
     wrap.innerHTML = html;
 
-    // Vitrine-Dropdowns mit Achievements befüllen
+// Vitrine-Dropdowns mit Achievements befüllen
     _fillVitrineDropdowns();
+    // Archiv laden
+    loadArchivList();
   } catch(err) {
     wrap.innerHTML = `<p style="color:var(--error);font-size:0.84rem">❌ Fehler: ${err.message}</p>`;
   }
@@ -6225,6 +6255,42 @@ async function deleteFirebaseUser(name) {
     showToast(`🗑️ ${name} gelöscht`);
     loadUserMgmtList();
   } catch(e) { showToast('⚠️ Löschen fehlgeschlagen'); }
+}
+
+async function setInactiveUser(name) {
+  if (!confirm(`„${name}" auf INAKTIV setzen?\n\nDer Account wird dauerhaft archiviert und aus der aktiven Bestenliste entfernt. Diese Aktion kann nicht rückgängig gemacht werden.`)) return;
+  try {
+    await window.firebaseSetInactive(name);
+    showToast(`📦 ${name} archiviert`);
+    loadUserMgmtList();
+  } catch(e) { showToast('⚠️ Fehler: ' + e.message); }
+}
+
+async function loadArchivList() {
+  const wrap = document.getElementById('archivList');
+  if (!wrap || typeof window.firebaseGetArchivUsers !== 'function') return;
+  try {
+    const users = await window.firebaseGetArchivUsers();
+    if (!users.length) { wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.82rem">Kein Archiv vorhanden.</p>'; return; }
+    const sorted = [...users].sort((a,b) => (b.xp||0) - (a.xp||0));
+    let html = `<div style="overflow-x:auto"><table class="lb-table" style="width:100%;font-size:0.80rem">
+      <thead><tr><th>#</th><th style="text-align:left">👤 Name</th><th>⚡ XP</th><th>🏅</th><th>📅 Inaktiv seit</th></tr></thead><tbody>`;
+    sorted.forEach((e, i) => {
+      const since = e.inactiveSince ? new Date(e.inactiveSince).toLocaleDateString('de-DE') : '–';
+      html += `<tr>
+        <td>${i+1}</td>
+        <td style="text-align:left"><strong>${e.name}</strong>
+          <div style="font-size:0.70rem;color:var(--text-muted)">${e.rank||'–'}</div></td>
+        <td><strong>${(e.xp||0).toLocaleString('de-DE')}</strong></td>
+        <td>${e.badges||0}</td>
+        <td style="color:var(--text-muted)">${since}</td>
+      </tr>`;
+    });
+    html += '</tbody></table></div>';
+    wrap.innerHTML = html;
+  } catch(err) {
+    wrap.innerHTML = `<p style="color:var(--error);font-size:0.82rem">Fehler: ${err.message}</p>`;
+  }
 }
 
 async function createTestUser() {
