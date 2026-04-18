@@ -1169,46 +1169,75 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
   const _db = firebase.database(); 
 </script>
 
-  window.firebaseUploadScore = async function(state) {
-    if (!state.name) return;
-    try {
-      await _fbDB.collection('leaderboard').doc(state.name).set({
-        name:     state.name,
-        xp:       state.xp        || 0,
-        prestige: state.prestige   || 0,
-        rank:     state.rank       || 1,
-        module:   state.module     || '–',
-        badges:   (state.unlockedBadges || []).length,
-        gender:   state.gender     || 'male',
-        profilePic: state.profilePic || '',
-        updated:  Date.now()
-      }, { merge: true });
-    } catch(e) { console.warn('Firebase Upload Fehler:', e); }
-  };
+<script>
+// ═══════════════════════════════════════════════════════
+// FIREBASE REALTIME DATABASE — BESTENLISTE-FUNKTIONEN
+// ═══════════════════════════════════════════════════════
 
-  window.firebaseSubscribeLeaderboard = function(callback) {
-    return _fbDB.collection('leaderboard').onSnapshot(snapshot => {
-      const entries = [];
-      snapshot.forEach(d => entries.push(d.data()));
-      entries.sort((a, b) => (b.xp||0) - (a.xp||0));
-      callback(entries);
-    }, err => console.warn('Firebase Listener Fehler:', err));
-  };
+/** Hilfsfunktion: Name → gültiger RTDB-Key (keine . # $ [ ] /) */
+function _fbKey(name) {
+  return name.replace(/[.#$\[\]\/]/g, '_');
+}
 
-  window.firebaseGetAllUsers = async function() {
-    const snap = await _fbDB.collection('leaderboard').get();
-    const users = [];
-    snap.forEach(d => users.push({ id: d.id, ...d.data() }));
-    return users;
-  };
+/** Bei jedem saveState(): Eigene Daten in RTDB hochladen */
+window.firebaseUploadScore = async function(st) {
+  if (!st.name) return;
+  try {
+    const rankName = (typeof getCurrentRank === 'function') ? getCurrentRank().name : '';
+    const modAbbr  = (typeof getModuleAbbr  === 'function') ? getModuleAbbr(st.module) : (st.module || '–');
+    // Vitrine: IDs → Objekte mit Emoji
+    const showcaseObjs = (st.showcase || []).map(id => {
+      const a = (typeof ACHIEVEMENTS !== 'undefined') ? ACHIEVEMENTS.find(x => x.id === id) : null;
+      return a ? { id, emoji: a.emoji, name: a.name } : null;
+    }).filter(Boolean);
+    await _db.ref('leaderboard/' + _fbKey(st.name)).update({
+      name:       st.name,
+      xp:         st.xp                         || 0,
+      prestige:   st.prestige                   || 0,
+      rank:       rankName,
+      module:     modAbbr,
+      badges:     (st.unlockedBadges || []).length,
+      gender:     st.gender                     || 'female',
+      profilePic: st.profilePic                 || '',
+      showcase:   showcaseObjs,
+      firstLogin: st.firstOpenTs                || Date.now(),
+      updated:    Date.now(),
+    });
+  } catch(e) { console.warn('Firebase Upload Fehler:', e); }
+};
 
-  window.firebaseDeleteUser = async function(name) {
-    await _fbDB.collection('leaderboard').doc(name).delete();
-  };
+/** Live-Listener: Bestenliste in Echtzeit empfangen */
+window.firebaseSubscribeLeaderboard = function(callback) {
+  _db.ref('leaderboard').on('value', snap => {
+    const entries = [];
+    snap.forEach(child => entries.push(child.val()));
+    entries.sort((a, b) => (b.xp || 0) - (a.xp || 0));
+    callback(entries);
+  }, err => console.warn('Firebase Listener Fehler:', err));
+};
 
-  window.firebaseCreateTestUser = async function(data) {
-    await _fbDB.collection('leaderboard').doc(data.name).set(data);
-  };
+/** Admin: Alle User aus RTDB laden */
+window.firebaseGetAllUsers = async function() {
+  const snap = await _db.ref('leaderboard').once('value');
+  const users = [];
+  snap.forEach(child => users.push(child.val()));
+  return users;
+};
+
+/** Admin: User aus RTDB löschen */
+window.firebaseDeleteUser = async function(name) {
+  await _db.ref('leaderboard/' + _fbKey(name)).remove();
+};
+
+/** Admin: Test-User in RTDB anlegen */
+window.firebaseCreateTestUser = async function(data) {
+  await _db.ref('leaderboard/' + _fbKey(data.name)).set({
+    ...data,
+    updated:    Date.now(),
+    firstLogin: data.firstLogin || Date.now(),
+    isTestUser: true,
+  });
+};
 </script>
 
 </head>
@@ -1941,6 +1970,11 @@ code { font-family:'Courier New',monospace;font-size:0.82em;background:rgba(255,
       <div class="prestige-display mt-12" id="prestigeDisplay" style="display:none">
         <span class="prestige-icon-big" id="prestigeIconBig">✦</span>
         <div><div class="prestige-level-name" id="prestigeLevelName">Bronze – Prestige I</div></div>
+      </div>
+	  <!-- NEU: Vitrine — bis zu 3 ausgewählte Achievements -->
+      <div id="vitrineWrap" style="display:none;margin-top:12px">
+        <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;font-family:var(--font-main)">⭐ Meine Vitrine</div>
+        <div id="vitrineRow" style="display:flex;gap:8px;flex-wrap:wrap"></div>
       </div>
       <div id="prestigeBtnWrap" style="display:none;margin-top:14px">
         <button class="btn btn-prestige btn-wide" onclick="offerPrestige()">✨ Prestige aufsteigen!</button>
@@ -2700,6 +2734,7 @@ let state = {
   // ── Rarity-Daten (NEU v6.0, für Seltenheitsgrad) ────────
   _rarityData:{},            // { badgeName: { owners, total } }
   specialBadgeProgress:{},   // { erkunder: ['HASH1',...], gutbelesen: [...] }
+  showcase:[],               // NEU: bis zu 3 Achievement-IDs für Vitrine
 };
 
 /* ═══════════════════════════════════════════════════════════
@@ -2707,15 +2742,11 @@ let state = {
    ═══════════════════════════════════════════════════════════ */
 function saveState() {
   localStorage.setItem('nlv6', JSON.stringify(state));
-}
-
-// SUCHE NACH: function saveState() {
-// ...am Ende der Funktion, vor der schließenden }:
-
-  // NEU: Bei jedem Speichern Score zu Firebase hochladen (wenn verfügbar)
+  // Score live in Firebase aktualisieren
   if (typeof window.firebaseUploadScore === 'function') {
     window.firebaseUploadScore(state).catch(e => console.warn('Firebase Upload:', e));
   }
+}
 
 function loadState() {
   // Kompatibilität: auch alten Key nlv5 prüfen
@@ -2772,6 +2803,7 @@ function loadState() {
       firstOpenTs:           p.firstOpenTs           || Date.now(),
       _rarityData:           p._rarityData           || {},
       specialBadgeProgress:  p.specialBadgeProgress  || {},
+      showcase:              p.showcase              || [],
     };
   } catch(e) { console.warn('State-Ladefehler:', e); }
 }
@@ -3682,6 +3714,7 @@ function render() {
   renderChallenges();
   renderOfficeMap();
   renderLogbuch();
+  renderVitrine();
   applyPrestigeTheme(state.prestige);
 }
 
@@ -4685,6 +4718,43 @@ function getGenderedAchName(name, gender) {
   return base + femSuffix;                          // "Geheimagent" + "in" → "Geheimagentin"
 }
 
+/* ═══════════════════════════════════════════════════════════
+   NEU: ACHIEVEMENT-VITRINE TOGGLE & RENDER
+   ═══════════════════════════════════════════════════════════ */
+function toggleShowcase(achId) {
+  if (!state.showcase) state.showcase = [];
+  const idx = state.showcase.indexOf(achId);
+  if (idx >= 0) {
+    state.showcase.splice(idx, 1);
+    showToast('⭐ Aus Vitrine entfernt.');
+  } else {
+    if (state.showcase.length >= 3) {
+      showToast('⚠️ Maximal 3 Achievements in der Vitrine!'); return;
+    }
+    state.showcase.push(achId);
+    showToast('⭐ Zur Vitrine hinzugefügt!');
+  }
+  saveState();
+  renderAchievements();
+  renderVitrine();
+}
+
+function renderVitrine() {
+  const wrap = document.getElementById('vitrineWrap');
+  const row  = document.getElementById('vitrineRow');
+  if (!wrap || !row) return;
+  const sc = state.showcase || [];
+  if (!sc.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  row.innerHTML = sc.map(id => {
+    const a = ACHIEVEMENTS.find(x => x.id === id);
+    if (!a) return '';
+    return `<div title="${a.name}" style="width:42px;height:42px;border-radius:10px;
+      background:rgba(255,255,255,0.05);border:1.5px solid var(--prestige-color);
+      display:flex;align-items:center;justify-content:center;font-size:1.3rem;cursor:default">${a.emoji}</div>`;
+  }).join('');
+}
+
 function renderAchievements() {
   const el = document.getElementById('achGrid');
   if (!el) return;
@@ -4724,6 +4794,14 @@ sorted.forEach(ach => {
     const xpTag      = ach.xp > 0
       ? `<span style="color:var(--prestige-color);font-size:0.75rem;font-weight:800">+${ach.xp} XP</span>` : '';
 
+const inShowcase = isUnlocked && (state.showcase || []).includes(ach.id);
+    const starBtn = isUnlocked
+      ? `<button onclick="toggleShowcase('${ach.id}')"
+           title="${inShowcase ? 'Aus Vitrine entfernen' : 'Zur Vitrine hinzufügen'}"
+           style="background:none;border:none;cursor:pointer;font-size:1.05rem;
+                  opacity:${inShowcase ? 1 : 0.25};padding:2px 4px;border-radius:6px;
+                  transition:opacity .2s;display:block;margin-top:4px">⭐</button>`
+      : '';
     html += `<div class="ach-card ${isUnlocked ? 'unlocked' : 'locked'}">
       <div class="ach-icon-wrap">${ach.emoji}</div>
       <div class="ach-body">
@@ -4732,7 +4810,7 @@ sorted.forEach(ach => {
         ${bonusTag}
         ${rarityPill}
       </div>
-      <div class="ach-status">${isUnlocked ? '✅' : '🔒'}</div>
+      <div class="ach-status" style="display:flex;flex-direction:column;align-items:center">${isUnlocked ? '✅' : '🔒'}${starBtn}</div>
     </div>`;
   });
 
@@ -4933,8 +5011,8 @@ function renderLiveLeaderboard() {
     return;
   }
   const isAdmin = state._isAdmin;
-  let html = `<table class="lb-table"><thead><tr>
-    <th>#</th><th></th><th>Name</th><th>Modul</th><th>XP</th><th>Abzeichen</th>${isAdmin ? '<th></th>' : ''}
+let html = `<table class="lb-table"><thead><tr>
+    <th>#</th><th></th><th>Name</th><th>Modul</th><th>XP</th><th>Abzeichen</th><th></th>
   </tr></thead><tbody>`;
   data.forEach((e, i) => {
     const isMe = e.name === state.name;
@@ -4947,7 +5025,7 @@ function renderLiveLeaderboard() {
       <td style="font-size:0.8rem;color:var(--text-muted)">${e.module || '–'}</td>
       <td><strong>${e.xp.toLocaleString('de-DE')}</strong></td>
       <td>${e.badges || 0}</td>
-      ${isAdmin ? `<td><button class="lb-eye-btn" onclick="openAdminUserDetail(this)" data-entry='${JSON.stringify(e).replace(/'/g,"&#39;")}'>👁️</button></td>` : ''}
+      <td><button class="lb-eye-btn" onclick="openUserDetailLive(this)" data-entry='${JSON.stringify(e).replace(/'/g,"&#39;")}'>👁️</button></td>
     </tr>`;
   });
   html += '</tbody></table>';
@@ -5107,6 +5185,101 @@ function showModuleStats() {
    38. ADMIN USER DETAIL MODAL
    ═══════════════════════════════════════════════════════════ */
 
+/* ═══════════════════════════════════════════════════════════
+   NEU: SPIELER-INFO aus Live-Bestenliste (Firebase-Daten)
+   Alle User sehen Vitrine + Basis-Info; Admins sehen mehr.
+   ═══════════════════════════════════════════════════════════ */
+function openUserDetailLive(btn) {
+  let e;
+  try { e = JSON.parse(btn.dataset.entry.replace(/&#39;/g, "'")); } catch { return; }
+
+  const isAdmin     = state._isAdmin;
+  const prestigeCfg = getPrestigeConfig(e.prestige || 0);
+  const firstLogin  = e.firstLogin ? new Date(e.firstLogin).toLocaleDateString('de-DE') : '–';
+  const lastUpdate  = e.updated   ? new Date(e.updated).toLocaleDateString('de-DE')    : '–';
+
+  // Vitrine rendern (kommt als Array von {emoji, name} aus Firebase)
+  const showcaseHtml = [0,1,2].map(i => {
+    const ach = (e.showcase || [])[i];
+    return `<div title="${ach?.name || 'Leer'}" style="width:52px;height:52px;border-radius:12px;
+      background:rgba(255,255,255,0.05);
+      border:1.5px solid ${ach ? 'var(--prestige-color)' : 'var(--card-border)'};
+      display:flex;align-items:center;justify-content:center;font-size:1.5rem">
+      ${ach ? ach.emoji : '⭐'}</div>`;
+  }).join('');
+
+  // Admin-Extrabereich
+  const adminSection = isAdmin ? `
+    <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--card-border)">
+      <div style="font-size:0.68rem;color:var(--warning);text-transform:uppercase;
+                  letter-spacing:0.07em;margin-bottom:8px;font-family:var(--font-main)">🛡️ Admin-Daten</div>
+      <div style="display:flex;flex-direction:column;gap:6px;font-size:0.82rem">
+        <div style="display:flex;justify-content:space-between;padding:6px 10px;
+                    background:rgba(255,255,255,0.04);border-radius:8px">
+          <span style="color:var(--text-muted)">🗓️ Erster Login</span><strong>${firstLogin}</strong>
+        </div>
+        <div style="display:flex;justify-content:space-between;padding:6px 10px;
+                    background:rgba(255,255,255,0.04);border-radius:8px">
+          <span style="color:var(--text-muted)">🕐 Letztes Update</span><strong>${lastUpdate}</strong>
+        </div>
+        ${e.isTestUser ? `<div style="padding:6px 10px;background:rgba(245,158,11,0.1);
+          border:1px solid rgba(245,158,11,0.3);border-radius:8px;
+          color:var(--warning);font-size:0.78rem;text-align:center">🧪 Test-User</div>` : ''}
+      </div>
+    </div>` : '';
+
+  const picHtml = e.profilePic
+    ? `<img src="${e.profilePic}" style="width:56px;height:56px;border-radius:50%;object-fit:cover">`
+    : `<span style="font-size:3rem">👤</span>`;
+
+  const html = `
+    <div style="text-align:center;padding:8px 0 14px">
+      ${picHtml}
+      <div style="font-weight:800;font-size:1.1rem;color:var(--prestige-color);margin-top:6px">${e.name}</div>
+      <div style="font-size:0.78rem;color:var(--text-muted);margin-top:2px">${prestigeCfg?.label || ''}</div>
+    </div>
+    <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;
+                letter-spacing:0.07em;margin-bottom:7px;text-align:center;font-family:var(--font-main)">⭐ Vitrine</div>
+    <div style="display:flex;gap:8px;justify-content:center;margin-bottom:16px">${showcaseHtml}</div>
+    <div style="display:flex;flex-direction:column;gap:7px;font-size:0.84rem">
+      <div style="display:flex;justify-content:space-between;padding:7px 12px;
+                  background:rgba(255,255,255,0.04);border-radius:8px">
+        <span style="color:var(--text-muted)">🏆 Rang</span>
+        <strong style="color:var(--prestige-color)">${e.rank || '–'}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:7px 12px;
+                  background:rgba(255,255,255,0.04);border-radius:8px">
+        <span style="color:var(--text-muted)">⚡ XP</span>
+        <strong>${(e.xp||0).toLocaleString('de-DE')}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:7px 12px;
+                  background:rgba(255,255,255,0.04);border-radius:8px">
+        <span style="color:var(--text-muted)">🏅 Abzeichen</span>
+        <strong>${e.badges || 0}</strong>
+      </div>
+      <div style="display:flex;justify-content:space-between;padding:7px 12px;
+                  background:rgba(255,255,255,0.04);border-radius:8px">
+        <span style="color:var(--text-muted)">🏛️ Modul</span>
+        <strong>${e.module || '–'}</strong>
+      </div>
+    </div>
+    ${adminSection}`;
+
+  // Modal öffnen (wiederverwendet infoModalOverlay)
+  let overlay = document.getElementById('infoModalOverlay');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'infoModalOverlay';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9900;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)';
+    overlay.innerHTML = `<div class="info-modal" id="infoModalInner" style="max-width:380px;width:93%;max-height:85vh;overflow-y:auto"></div>`;
+    overlay.addEventListener('click', ev => { if (ev.target === overlay) overlay.remove(); });
+    document.body.appendChild(overlay);
+  }
+  const inner = document.getElementById('infoModalInner');
+  if (inner) inner.innerHTML = html + `<div style="text-align:right;margin-top:16px">
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('infoModalOverlay').remove()">Schließen</button></div>`;
+  overlay.style.display = 'flex';
+}
 // NEU: Spieler-Info für alle User (Standard-Ansicht) — VOR openAdminUserDetail einfügen
 function openUserDetailAny(btn) {
   const isAdmin = state._isAdmin;
