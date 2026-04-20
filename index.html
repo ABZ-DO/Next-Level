@@ -2713,7 +2713,7 @@ const WEEKLY_CHALLENGES = [
 const EASTER_BADGES = [
   { id:'ehrensache',   emoji:'🤝', name:'Ehrensache',                      desc:'Gib deine Codes niemals weiter!',               xp:0,  introOnly:true  },
   { id:'cookieclicker',emoji:'🍪', name:'Cookie Clicker',                  desc:'Klicke 10x hintereinander auf dieses Abzeichen.',xp:0,  cookie:true     },
-  { id:'spurnase',     emoji:'🔍', name:'Spürnase',                        desc:'Klicke auf das Next-Level-Logo oben links.',     xp:0                   },
+{ id:'spurnase',     emoji:'🔍', name:'Spürnase',                        desc:'Klicke auf das Next-Level-Logo oben links.',     xp:50                  },
   { id:'pause',        emoji:'☕', name:'Hast du nicht Pause?',             desc:'Gib einen Code zwischen 12 und 13 Uhr ein.',     xp:0                   },
   { id:'abzftw',       emoji:'🏫', name:'ABZ ftw!',                        desc:'Gib den Code Ausbildungszentrum oder ABZ ein.',  xp:50                  },
   { id:'stalker',      emoji:'👀', name:'Stalker',                         desc:'Was guckst du?',                                 xp:50                  },
@@ -2811,6 +2811,11 @@ const SECRET_ACHIEVEMENT = {
   xp:0, desc:'Mogeln ist out! (Alle Wochentage als Schultag eingestellt)',
   bonus:null, title:null, isSpecialSecret:true
 };
+const COOKIE_ACHIEVEMENT = {
+  id:'cookie_clicker', emoji:'🍪', name:'Cookie Clicker',
+  xp:100, desc:'10x auf das geheime Cookie-Achievement geklickt.',
+  bonus:null, title:null, isSpecialSecret:true
+};
 
 /* ═══════════════════════════════════════════════════════════
    6b. ACHIEVEMENT-HILFSFUNKTIONEN
@@ -2895,6 +2900,7 @@ let state = {
   firstOpenTs:null,          // Timestamp erster Start
   // ── Rarity-Daten (NEU v6.0, für Seltenheitsgrad) ────────
   _rarityData:{},            // { badgeName: { owners, total } }
+    cookieAchClicks:0,
   specialBadgeProgress:{},   // { erkunder: ['HASH1',...], gutbelesen: [...] }
   showcase:[],               // NEU: bis zu 3 Achievement-IDs für Vitrine
 };
@@ -2964,6 +2970,7 @@ function loadState() {
       totalClickCount:       p.totalClickCount       || 0,
       firstOpenTs:           p.firstOpenTs           || Date.now(),
       _rarityData:           p._rarityData           || {},
+	  cookieAchClicks:       p.cookieAchClicks       || 0,
       specialBadgeProgress:  p.specialBadgeProgress  || {},
       showcase:              p.showcase              || [],
     };
@@ -5029,8 +5036,11 @@ const inShowcase = isUnlocked && (state.showcase || []).includes(ach.id);
   });
 
   // Secret Achievement
-  const secUnlocked = state.unlockedAchievements.some(u => u.id === SECRET_ACHIEVEMENT.id);
-  html += `<div class="ach-separator">🔐 Geheimes Achievement</div>
+const secUnlocked    = state.unlockedAchievements.some(u => u.id === SECRET_ACHIEVEMENT.id);
+  const cookieUnlocked = state.unlockedAchievements.some(u => u.id === COOKIE_ACHIEVEMENT.id);
+  const cookieClicks   = state.cookieAchClicks || 0;
+
+  html += `<div class="ach-separator">🔐 Geheime Achievements</div>
     <div class="ach-card ach-secret-special ${secUnlocked ? 'unlocked' : 'locked'}">
       <div class="ach-icon-wrap">${secUnlocked ? SECRET_ACHIEVEMENT.emoji : '❓'}</div>
       <div class="ach-body">
@@ -5038,6 +5048,20 @@ const inShowcase = isUnlocked && (state.showcase || []).includes(ach.id);
         <div class="ach-desc">${secUnlocked ? SECRET_ACHIEVEMENT.desc : 'Noch nicht entdeckt.'}</div>
       </div>
       <div class="ach-status">${secUnlocked ? '✅' : '🔒'}</div>
+    </div>
+    <div class="ach-card ach-secret-special ${cookieUnlocked ? 'unlocked' : 'locked'}"
+         onclick="onCookieAchClick()"
+         style="cursor:pointer"
+         title="${cookieUnlocked ? '' : 'Klicke mich...'}">
+      <div class="ach-icon-wrap" style="position:relative">
+        ${cookieUnlocked ? '🍪' : '<span style="font-size:1.4rem">👁️</span><span style="position:absolute;bottom:-2px;right:-2px;font-size:0.75rem">🍪</span>'}
+      </div>
+      <div class="ach-body">
+        <div class="ach-name">${cookieUnlocked ? COOKIE_ACHIEVEMENT.name : '???'}</div>
+        <div class="ach-desc">${cookieUnlocked ? COOKIE_ACHIEVEMENT.desc : 'Noch nicht entdeckt.'}</div>
+        ${!cookieUnlocked && cookieClicks > 0 ? `<div style="font-size:0.72rem;color:var(--text-muted);margin-top:4px">${cookieClicks}/10</div>` : ''}
+      </div>
+      <div class="ach-status">${cookieUnlocked ? '✅' : '🔒'}</div>
     </div>`;
 
 if (lastGroup !== null) html += `</div>`; // letzte Gruppe schließen
@@ -6584,17 +6608,41 @@ function importSave() {
 /* ═══════════════════════════════════════════════════════════
    47. LOGO-KLICK (Easter Egg: Spürnase)
    ═══════════════════════════════════════════════════════════ */
+function onCookieAchClick() {
+  if (state.unlockedAchievements.some(u => u.id === COOKIE_ACHIEVEMENT.id)) {
+    fireSmallConfetti(); return;
+  }
+  state.cookieAchClicks = (state.cookieAchClicks || 0) + 1;
+  if (state.cookieAchClicks >= 10) {
+    state.unlockedAchievements.push({ id: COOKIE_ACHIEVEMENT.id, ts: Date.now() });
+    state.xp      += COOKIE_ACHIEVEMENT.xp;
+    state.totalXP  = (state.totalXP || 0) + COOKIE_ACHIEVEMENT.xp;
+    spawnXPFloat(COOKIE_ACHIEVEMENT.xp);
+    addLogbuchEntry({ type:'achievement', icon: COOKIE_ACHIEVEMENT.emoji, typeLabel:'Achievement',
+      title: COOKIE_ACHIEVEMENT.name, reward:`+${COOKIE_ACHIEVEMENT.xp} XP`,
+      desc: COOKIE_ACHIEVEMENT.desc, ts: Date.now() });
+    const gainedRanks = checkRankUp();
+    saveState(); render();
+    scheduleModals(gainedRanks, [COOKIE_ACHIEVEMENT]);
+  } else {
+    saveState(); renderAchievements();
+  }
+}
 function onLogoClick() {
   state.cookieClickCount = (state.cookieClickCount||0) + 1;
   state.totalClickCount  = (state.totalClickCount||0)  + 1;
 
-  // Spürnase Easter Egg: erstes Klicken
-  _unlockEasterBadge('spurnase', null);
+  const spurnase = EASTER_BADGES.find(b => b.id === 'spurnase');
+  const bereitsFreigeschaltet = spurnase && state.unlockedBadges.some(b => b.name === spurnase.name);
 
-  // Cookie-Clicker Badge: 10x auf das Cookie-Abzeichen (hier: Logo)
-  if (state.cookieClickCount >= 10) {
-    _unlockEasterBadge('cookieclicker', null);
+  if (bereitsFreigeschaltet) {
+    // Schon freigeschaltet: nur Konfetti, sonst nichts
+    fireSmallConfetti();
+  } else {
+    // Erstmalig: Badge + XP + Popup
+    _unlockEasterBadge('spurnase', null);
   }
+
   saveState();
 }
 
