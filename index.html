@@ -2425,15 +2425,16 @@ window.firebaseCreateTestUser = async function(data) {
   </p>
 
   <!-- Modul-Filter -->
-  <div class="lb-filter-row" id="lbFilterRow">
+<div class="lb-filter-row" id="lbFilterRow">
     <span class="lb-filter-label">Filter:</span>
-<button class="lb-filter-btn active" onclick="filterLeaderboardLive('all',this)">Alle</button>
-<button class="lb-filter-btn" onclick="showModuleStatsLive(this)" id="lbModulRankingBtn" style="margin-left:auto;border-color:var(--gold,#c9a84c);color:var(--gold,#c9a84c)">📈 Modul-Ranking</button>
+    <button class="lb-filter-btn active" onclick="filterLeaderboardLive('all',this)">Alle</button>
     <button class="lb-filter-btn" onclick="filterLeaderboardLive('P&O',this)">P&amp;O</button>
     <button class="lb-filter-btn" onclick="filterLeaderboardLive('F',this)">F</button>
     <button class="lb-filter-btn" onclick="filterLeaderboardLive('R&O',this)">R&amp;O</button>
     <button class="lb-filter-btn" onclick="filterLeaderboardLive('LV',this)">LV</button>
     <button class="lb-filter-btn" onclick="filterLeaderboardLive('D',this)">D</button>
+    <div style="flex:1"></div>
+    <button class="lb-filter-btn" onclick="showModuleStatsLive(this)" id="lbModulRankingBtn" style="border-color:var(--gold,#c9a84c);color:var(--gold,#c9a84c)">📈 Modul-Ranking</button>
   </div>
   <div id="lbTableWrap"><p style="color:var(--text-muted);font-size:0.84rem">⏳ Verbinde mit Datenbank…</p></div>
 </div>
