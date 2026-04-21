@@ -2427,7 +2427,8 @@ window.firebaseCreateTestUser = async function(data) {
   <!-- Modul-Filter -->
   <div class="lb-filter-row" id="lbFilterRow">
     <span class="lb-filter-label">Filter:</span>
-    <button class="lb-filter-btn active" onclick="filterLeaderboardLive('all',this)">Alle</button>
+<button class="lb-filter-btn active" onclick="filterLeaderboardLive('all',this)">Alle</button>
+    <button class="lb-filter-btn" onclick="showModuleStatsLive(this)" id="lbModulRankingBtn" style="margin-left:10px;border-color:var(--gold,#c9a84c);color:var(--gold,#c9a84c)">📈 Modul-Ranking</button>
     <button class="lb-filter-btn" onclick="filterLeaderboardLive('P&O',this)">P&amp;O</button>
     <button class="lb-filter-btn" onclick="filterLeaderboardLive('F',this)">F</button>
     <button class="lb-filter-btn" onclick="filterLeaderboardLive('R&O',this)">R&amp;O</button>
@@ -5056,8 +5057,7 @@ const secUnlocked    = state.unlockedAchievements.some(u => u.id === SECRET_ACHI
     </div>
 <div class="ach-card ach-secret-special ${cookieUnlocked ? 'unlocked' : 'locked'}">
       <div class="ach-icon-wrap" onclick="onCookieAchClick()" style="${cookieUnlocked ? '' : 'cursor:pointer'}">
-${cookieUnlocked ? '🍪' : '<span style="position:relative;display:inline-block">❓<span style="position:absolute;bottom:-4px;right:-6px;font-size:0.65rem">🍪</span></span>'}
-      </div>
+'<span style="position:relative;display:inline-block">❓<span style="position:absolute;bottom:-2px;right:-2px;font-size:0.65rem">🍪</span></span>'      </div>
       <div class="ach-body">
         <div class="ach-name">${cookieUnlocked ? COOKIE_ACHIEVEMENT.name : '???'}</div>
         <div class="ach-desc">${cookieUnlocked ? COOKIE_ACHIEVEMENT.desc : 'Noch nicht entdeckt.'}</div>
@@ -5255,9 +5255,73 @@ function filterLeaderboardLive(mod, btn) {
   renderLiveLeaderboard();
 }
 
+function showModuleStatsLive(btn) {
+  const wrap = document.getElementById('lbTableWrap');
+  if (!wrap) return;
+
+  // Filter-Buttons zurücksetzen, Modul-Ranking-Button aktiv
+  document.querySelectorAll('.lb-filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  _lbLiveFilter = '__moduleranking__'; // verhindert sofortiges Überschreiben
+
+  // Nur echte, aktive User (keine TestUser)
+  const allUsers = (_lbLiveData || []).filter(e => !e.isTestUser && e.name);
+
+  // Nach Modul-Abkürzung gruppieren (alle 5 Module immer anzeigen)
+  const ALL_MODULES = ['P&O', 'F', 'R&O', 'LV', 'D'];
+  const byModule = {};
+  ALL_MODULES.forEach(m => byModule[m] = []);
+  allUsers.forEach(e => {
+    const m = e.module || '–';
+    if (byModule[m]) byModule[m].push(e);
+  });
+
+  const stats = ALL_MODULES.map(mod => {
+    const users = byModule[mod];
+    const n = users.length;
+    if (n < 3) return { mod, n, insufficient: true };
+    const avgXP     = Math.round(users.reduce((s, u) => s + (u.totalXP || u.xp || 0), 0) / n);
+    const avgBadges = (users.reduce((s, u) => s + (u.badges || 0), 0) / n).toFixed(1);
+    return { mod, n, avgXP, avgBadges, insufficient: false };
+  }).sort((a, b) => {
+    if (a.insufficient && !b.insufficient) return 1;
+    if (!a.insufficient && b.insufficient) return -1;
+    return (b.avgXP || 0) - (a.avgXP || 0);
+  });
+
+  const rows = stats.map((s, i) => s.insufficient
+    ? `<tr>
+        <td style="color:var(--text-muted)">${i + 1}</td>
+        <td style="font-weight:700">${s.mod}</td>
+        <td>${s.n}</td>
+        <td colspan="2" style="color:var(--text-muted);font-size:0.82rem">Mind. 3 TN erforderlich</td>
+       </tr>`
+    : `<tr>
+        <td style="color:var(--prestige-color);font-weight:700">${i < 3 ? ['🥇','🥈','🥉'][i] : i + 1}</td>
+        <td style="font-weight:800;color:var(--cream)">${s.mod}</td>
+        <td style="color:var(--text-muted)">${s.n}</td>
+        <td><strong style="color:var(--prestige-color)">${s.avgXP.toLocaleString('de-DE')}</strong></td>
+        <td>${s.avgBadges}</td>
+       </tr>`
+  ).join('');
+
+  wrap.innerHTML = `
+    <div style="margin-bottom:10px">
+      <span style="font-size:0.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em">📈 Modul-Ranking — Ø-Werte je aktiver Teilnehmer</span>
+    </div>
+    <table class="lb-table">
+      <thead><tr>
+        <th>#</th><th>Modul</th><th>TN</th><th>Ø Gesamt-XP</th><th>Ø Abzeichen</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+    <p style="font-size:0.74rem;color:var(--text-muted);margin-top:8px">Archivierte und gelöschte Nutzer werden nicht gezählt. Mind. 3 aktive TN pro Modul erforderlich.</p>`;
+}
+
 function renderLiveLeaderboard() {
   const wrap = document.getElementById('lbTableWrap');
   if (!wrap) return;
+  if (_lbLiveFilter === '__moduleranking__') return; // Modul-Ranking aktiv, nicht überschreiben
   let data = _lbLiveData;
   if (_lbLiveFilter !== 'all') data = data.filter(e => e.module === _lbLiveFilter);
   if (data.length === 0) {
@@ -5282,7 +5346,7 @@ const titleBefore = (e.activeTitle && e.titlePos !== 'suffix') ? `<span style="f
       <td class="prestige-icon-col">${prestigeIcon}</td>
 <td>${titleBefore}${isMe ? '👉 ' : ''}<strong>${e.name}</strong>${titleAfter}</td>
       <td style="font-size:0.8rem;color:var(--text-muted)">${e.module || '–'}</td>
-      <td><strong>${(e.xp||0).toLocaleString('de-DE')}</strong></td>
+<td><strong>${(e.totalXP||e.xp||0).toLocaleString('de-DE')}</strong></td>
       <td>${e.badges || 0}</td>
       <td><button class="lb-eye-btn" onclick="openUserDetailLive(this)" data-entry='${safeEntry}'>👁️</button></td>
     </tr>`;
