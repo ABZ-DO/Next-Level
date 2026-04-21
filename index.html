@@ -4383,7 +4383,17 @@ function processCode(found, input, fb) {
   const newAchs    = checkAchievements();
   const gainedRanks = checkRankUp();
   saveState(); render();
+  // Badge-Popup vor Achievements und Rang-Aufstieg einreihen
+  if (found.badge && !found.adminOnly) {
+    _modalQueue.push({ type:'badge', badge:{
+      emoji: found.badge.emoji,
+      name:  found.badge.name,
+      desc:  found.badge.desc,
+      xp:    found.xp
+    }});
+  }
   scheduleModals(gainedRanks, newAchs);
+  if (!_modalBusy) processModalQueue();
 }
 
 function _completeModulChallengeByCode(type, fb, input) {
