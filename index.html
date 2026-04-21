@@ -2701,7 +2701,6 @@ const WEEKLY_CHALLENGES = [
    introOnly:true  → zählt NICHT für Doppelagent
    ═══════════════════════════════════════════════════════════ */
 const EASTER_BADGES = [
-  { id:'ehrensache',   emoji:'🤝', name:'Ehrensache',                      desc:'Gib deine Codes niemals weiter!',               xp:0,  introOnly:true  },
   { id:'cookieclicker',emoji:'🍪', name:'Cookie Clicker',                  desc:'Klicke 10x hintereinander auf dieses Abzeichen.',xp:0,  cookie:true     },
 { id:'spurnase',     emoji:'🔍', name:'Spürnase',                        desc:'Klicke auf das Next-Level-Logo oben links.',     xp:50                  },
   { id:'pause',        emoji:'☕', name:'Hast du nicht Pause?',             desc:'Gib einen Code zwischen 12 und 13 Uhr ein.',     xp:0                   },
@@ -3166,20 +3165,19 @@ function redeemIntroCode() {
   input?.classList.add('success');
   if (errEl) errEl.style.display = 'none';
 
-  // Ehrensache-Badge freischalten (still, ohne Toast)
-  const eb = EASTER_BADGES.find(b => b.id === 'ehrensache');
-  if (eb && !state.unlockedBadges.some(b => b.name === eb.name)) {
+// Ehrensache-Badge freischalten (reguläres Abzeichen aus CODES)
+  const ehrenCode = CODES.find(c => c.hash === btoa('IchGebeCodesNiemalsAnAndereWeiter'));
+  if (ehrenCode && !state.unlockedBadges.some(b => b.name === ehrenCode.badge.name)) {
     const ts = Date.now();
-    state.unlockedBadges.push({ emoji:eb.emoji, name:eb.name, desc:eb.desc, ts });
+    state.unlockedBadges.push({ emoji:ehrenCode.badge.emoji, name:ehrenCode.badge.name, desc:ehrenCode.badge.desc, ts });
     addLogbuchEntry({
       type:'badge', icon:'🤝', typeLabel:'Abzeichen',
-      title:eb.name, reward:'+0 XP',
-      desc:'Intro-Abzeichen freigeschaltet.', ts
+      title:ehrenCode.badge.name, reward:'+0 XP',
+      desc:ehrenCode.badge.desc, ts
     });
   }
 
-// Starter-Achievement direkt vergeben (Ehrensache zählt nicht als sichtbares Abzeichen,
-  // daher kann der normale check() es nicht auslösen)
+// Starter-Achievement direkt vergeben (Absicherung, falls checkAchievements nicht greift)
   const starterAch = ACHIEVEMENTS.find(a => a.id === 'starter');
   if (starterAch && !state.unlockedAchievements.some(u => u.id === 'starter')) {
     const ts = Date.now();
