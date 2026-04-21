@@ -3558,9 +3558,10 @@ function _renderModulChallenge(type, rows) {
   const isDone  = !!doneMap[doneKey];
 
   const prefix  = isDaily ? 'modulDaily' : 'modulWeekly';
-  const typeStr = isDaily ? `🌅 Modul Daily — ${getTodayStr()}` : `📅 Modul Weekly — ${getWeekKey()}`;
+const _todayFmt = (() => { const [y,m,d] = getTodayStr().split('-'); return `${d}.${m}.${y}`; })();
+  const typeStr = isDaily ? `🌅 Modul Daily — ${_todayFmt}` : `📅 Modul Weekly — ${getWeekKey()}`;
 
-  _setEl(`${prefix}DateLabel` , isDaily ? getTodayStr() : getWeekKey(), false);
+_setEl(`${prefix}DateLabel` , isDaily ? _todayFmt : getWeekKey(), false);
   _setEl(`${prefix}Title`     , row.Titel       || row.Title || '–');
   _setEl(`${prefix}Desc`      , row.Beschreibung || row.Description || '–');
   _setEl(`${prefix}XpLabel`   , `+${row.XP || '?'} XP`);
