@@ -125,6 +125,9 @@ body {
 /* Zeiger ohne Tooltip-Textfeld */
 #actPointer { position:absolute;width:22px;height:22px;background:#fff;border-radius:50%;border:3px solid rgba(0,0,0,0.2);box-shadow:0 2px 8px rgba(0,0,0,0.4);transform:translate(-50%,-50%);top:50%;transition:left 0.6s cubic-bezier(0.34,1.56,0.64,1);z-index:1; }
 
+/* Admin-Stern */
+#adminStar { display:none;font-size:1.1rem;line-height:1;cursor:default;transition:color .3s;margin-left:4px;filter:drop-shadow(0 0 4px currentColor); }
+
 /* ══════════════════════════════════════════════════════════
    4. ONBOARDING (Name-Eingabe) — erweitert mit Anrede & Modul
    ══════════════════════════════════════════════════════════ */
@@ -1231,8 +1234,9 @@ window.firebaseUploadScore = async function(st) {
       gender:      st.gender || 'female',
       profilePic:  st.profilePic || '',
       showcase:    showcaseObjs,
-activeTitle: activeTitleText,
-      titlePos:    achObj?.title?.position || '',
+activeTitle:   activeTitleText,
+      activeTitleId: st.activeTitle || '',
+      titlePos:      achObj?.title?.position || '',
       firstLogin:  st.firstOpenTs || Date.now(),
       updated:     Date.now(),
       // Für Seltenheits-Berechnung
@@ -1320,6 +1324,34 @@ window.firebaseGetArchivUsers = async function() {
   const users = [];
   snap.forEach(child => { const v = child.val(); if (v && v.name) users.push(v); });
   return users;
+};
+
+/** Ewigkeits-Ranking: Alle User aus leaderboard + archiv laden */
+window.firebaseGetAllUsersIncludeArchiv = async function() {
+  const [snapLb, snapAr] = await Promise.all([
+    _db.ref('leaderboard').once('value'),
+    _db.ref('archiv').once('value')
+  ]);
+  const users = [];
+  snapLb.forEach(child => { const v = child.val(); if (v && v.name) users.push(v); });
+  snapAr.forEach(child => { const v = child.val(); if (v && v.name) users.push({ ...v, isArchived: true }); });
+  return users;
+};
+
+/** Timeline: XP-Ereignis global loggen */
+window.firebaseLogTimeline = async function(entry) {
+  if (!entry || !entry.name) return;
+  try { await _db.ref('timeline').push({ ...entry, ts: Date.now() }); } catch(e) {}
+};
+
+/** Timeline: Letzte N Ereignisse laden */
+window.firebaseGetTimeline = async function(limit = 200) {
+  try {
+    const snap = await _db.ref('timeline').orderByChild('ts').limitToLast(limit).once('value');
+    const items = [];
+    snap.forEach(child => items.unshift(child.val()));
+    return items;
+  } catch(e) { return []; }
 };
 
 /** Admin: Test-User in RTDB anlegen */
@@ -2028,7 +2060,10 @@ window.firebaseCreateTestUser = async function(data) {
     <div><h1>Next Level</h1><small>Dein Begleiter im Ausbildungszentrum.</small></div>
   </div>
   <div class="header-right">
-    <div class="profile-pic-wrap"><div id="profilePicCircle">👤</div></div>
+<div class="profile-pic-wrap" style="position:relative;display:inline-flex;align-items:center">
+      <div id="profilePicCircle">👤</div>
+      <span id="adminStar" title="Admin-Modus aktiviert">⭐</span>
+    </div>
     <div class="header-user">
 <div class="username-wrap">
         <div class="header-title-pill" id="headerTitlePill" style="display:none"></div>
@@ -2067,7 +2102,7 @@ window.firebaseCreateTestUser = async function(data) {
       </div>
 	  <!-- NEU: Vitrine — bis zu 3 ausgewählte Achievements -->
       <div id="vitrineWrap" style="display:none;margin-top:12px">
-        <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;font-family:var(--font-main)">⭐ Meine Vitrine</div>
+<div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;font-family:var(--font-main);display:flex;align-items:center;gap:6px">⭐ Meine Vitrine <button class="info-btn" onclick="openVitrineInfo()" style="font-size:0.85rem;line-height:1" title="Was ist die Vitrine?">ℹ️</button></div>
         <div id="vitrineRow" style="display:flex;gap:8px;flex-wrap:wrap"></div>
       </div>
       <div id="prestigeBtnWrap" style="display:none;margin-top:14px">
@@ -2142,7 +2177,8 @@ window.firebaseCreateTestUser = async function(data) {
       <button class="tab-btn" onclick="switchTab('challenges',this)">🎯 Challenges</button>
       <button class="tab-btn" onclick="switchTab('achievements',this)">🏆 Achievements</button>
       <button class="tab-btn" onclick="switchTab('leaderboard',this)">📊 Bestenliste</button>
-	  <button class="tab-btn" id="userMgmtTabBtn" onclick="switchTab('usermgmt',this)" style="display:none">👥 Benutzerverwaltung</button>
+<button class="tab-btn" id="userMgmtTabBtn" onclick="switchTab('usermgmt',this)" style="display:none">👥 Benutzerverwaltung</button>
+      <button class="tab-btn" id="timelineTabBtn" onclick="switchTab('timeline',this)" style="display:none">📡 Timeline</button>
       <button class="tab-btn" onclick="switchTab('backup',this)">💾 Backup</button>
       <button class="tab-btn" onclick="switchTab('logbuch',this)">📖 Logbuch</button>
       <button class="tab-btn" onclick="switchTab('devlog',this)">📋 Dev-Log</button>
@@ -2422,12 +2458,22 @@ window.firebaseCreateTestUser = async function(data) {
     <button class="lb-filter-btn" onclick="filterLeaderboardLive('LV',this)">LV</button>
     <button class="lb-filter-btn" onclick="filterLeaderboardLive('D',this)">D</button>
     <div style="flex:1"></div>
-    <button class="lb-filter-btn" onclick="showModuleStatsLive(this)" id="lbModulRankingBtn" style="border-color:var(--gold,#c9a84c);color:var(--gold,#c9a84c)">📈 Modul-Ranking</button>
+<button class="lb-filter-btn" onclick="showModuleStatsLive(this)" id="lbModulRankingBtn" style="border-color:var(--gold,#c9a84c);color:var(--gold,#c9a84c)">📈 Modul-Ranking</button>
+    <button class="lb-filter-btn" onclick="showEwigkeitsRankingLive(this)" id="lbEwigkeitsBtn" style="border-color:#7a8aac;color:#7a8aac" title="Alle je aktiven Nutzer – inkl. Archiv">🌐 Ewigkeits-Ranking</button>
   </div>
-  <div id="lbTableWrap"><p style="color:var(--text-muted);font-size:0.84rem">⏳ Verbinde mit Datenbank…</p></div>
+  <div id="lbTableWrap">
 </div>
 
-<!-- TAB: Benutzerverwaltung (nur Admin) -->
+<!-- TAB: Timeline (nur Super-Admin) -->
+  <div class="tab-panel" id="tab-timeline">
+    <div class="tile-title"><span class="icon">📡</span> Globale Timeline</div>
+    <p style="color:var(--text-muted);font-size:0.84rem;margin-bottom:12px">Alle XP-Ereignisse aller Nutzer in Echtzeit.</p>
+    <div id="timelineList" style="display:flex;flex-direction:column;gap:4px">
+      <p style="color:var(--text-muted);font-size:0.84rem">⏳ Lade Timeline…</p>
+    </div>
+  </div>
+
+  <!-- TAB: Benutzerverwaltung (nur Admin) -->
 <div class="tab-panel" id="tab-usermgmt">
   <div class="tile-title"><span class="icon">👥</span> Benutzerverwaltung</div>
 
@@ -2561,7 +2607,8 @@ window.firebaseCreateTestUser = async function(data) {
    0. KONFIGURATION & KONSTANTEN
    ═══════════════════════════════════════════════════════════ */
 const INTRO_CODE        = 'IchWerdeMeineCodesNiemalsWeitergeben';
-const MASTER_HASH       = 'R2VoZWltMTIzIQ==';       
+const MASTER_HASH       = 'R2VoZWltMTIzIQ==';
+const SUPER_MASTER_HASH = btoa('Geheim123++');   // ← Erweiterter Admin    
 const DAILY_XP          = 75;
 const WEEKLY_XP         = 250;
 
@@ -2703,7 +2750,6 @@ const WEEKLY_CHALLENGES = [
 const EASTER_BADGES = [
   { id:'cookieclicker',emoji:'🍪', name:'Cookie Clicker',                  desc:'Klicke 10x hintereinander auf dieses Abzeichen.',xp:0,  cookie:true     },
 { id:'spurnase',     emoji:'🔍', name:'Spürnase',                        desc:'Klicke auf das Next-Level-Logo oben links.',     xp:50                  },
-  { id:'pause',        emoji:'☕', name:'Hast du nicht Pause?',             desc:'Gib einen Code zwischen 12 und 13 Uhr ein.',     xp:0                   },
   { id:'abzftw',       emoji:'🏫', name:'ABZ ftw!',                        desc:'Gib den Code Ausbildungszentrum oder ABZ ein.',  xp:50                  },
   { id:'stalker',      emoji:'👀', name:'Stalker',                         desc:'Was guckst du?',                                 xp:50                  },
   { id:'achwiegut',    emoji:'🧙', name:'Ach wie gut, dass niemand weiß…', desc:'Benenne dich in den Einstellungen um.',          xp:0                   },
@@ -2789,6 +2835,9 @@ const ACHIEVEMENTS = [
     title:{female:'die Magnetmeisterin',male:'der Magnetmeister',position:'suffix'},
     check:(s)=>(s.officeMapStreak||0)>=20 },
   // ── Gruppe: Sonstiges ─────────────────────────────────
+{ id:'schausteller',         group:'misc',             emoji:'🎪', name:'Schausteller/in',          xp:75,  desc:'Erstes Achievement in die Vitrine gestellt.',  bonus:null,
+    title:null,
+    check:()=>false },
   { id:'eigenlob',             group:'misc',             emoji:'😏', name:'Eigenlob stimmt!',         xp:0,   desc:'Einen Titel ausgewählt.',                      bonus:null,
     title:null,
     check:()=>false },
@@ -2803,6 +2852,11 @@ const SECRET_ACHIEVEMENT = {
 const COOKIE_ACHIEVEMENT = {
   id:'cookie_clicker', emoji:'🍪', name:'Cookie Clicker',
   xp:100, desc:'10x auf das geheime Cookie-Achievement geklickt.',
+  bonus:null, title:null, isSpecialSecret:true
+};
+const PAUSE_ACHIEVEMENT = {
+  id:'pause', emoji:'☕', name:'Hast du nicht Pause?',
+  xp:0, desc:'XP zwischen 12 und 13 Uhr erhalten.',
   bonus:null, title:null, isSpecialSecret:true
 };
 
@@ -3662,6 +3716,11 @@ function applyTheme(t) {
  */
 function addLogbuchEntry(entry) {
   if (!state.logbuch) state.logbuch = [];
+  // Global Timeline loggen (für Admin+ Timeline-Tab)
+  if (state.name && (entry.xp > 0 || (entry.reward||'').includes('XP')) && typeof window.firebaseLogTimeline === 'function') {
+    const xpNum = parseInt((entry.reward||'').replace(/\D/g,'')) || entry.xp || 0;
+    window.firebaseLogTimeline({ name: state.name, xp: xpNum, title: entry.title||'', label: entry.typeLabel||'' });
+  }
   // Neueste Einträge zuerst
   state.logbuch.unshift({
     type:      entry.type      || 'misc',
@@ -3746,6 +3805,16 @@ function spawnXPFloat(xp) {
   el.style.top   = (window.innerHeight / 2 - 20) + 'px';
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 1500);
+  // Pause-Achievement: erstes Mal XP zwischen 12-13 Uhr
+  if (xp > 0 && new Date().getHours() === 12 && state.name) {
+    if (!state.unlockedAchievements.some(u => u.id === 'pause')) {
+      state.unlockedAchievements.push({ id:'pause', name:PAUSE_ACHIEVEMENT.name, ts:Date.now() });
+      addLogbuchEntry({ type:'achievement', icon:'☕', typeLabel:'Geheimes Achievement',
+        title:'Hast du nicht Pause?', reward:'', desc:PAUSE_ACHIEVEMENT.desc, ts:Date.now() });
+      saveState();
+      setTimeout(() => showAchievementModal(PAUSE_ACHIEVEMENT, PAUSE_ACHIEVEMENT.name), 1200);
+    }
+  }
 }
 
 /** Toast-Nachricht anzeigen */
@@ -4301,6 +4370,8 @@ function redeemCode() {
     openModal('prestigePendingModal'); return;
   }
 
+// Super-Admin freischalten (prüfe zuerst!)
+  if (btoa(raw) === SUPER_MASTER_HASH) { openSuperAdminPanel(); if(input) input.value=''; return; }
   // Admin freischalten
   if (btoa(raw) === MASTER_HASH) { openAdminPanel(); if(input) input.value=''; return; }
 
@@ -4324,9 +4395,6 @@ for (const sb of SPECIAL_BADGES) {
     return;
   }
 }
-
-  // Pause-Easter-Egg (12-13 Uhr)
-  if (new Date().getHours() === 12) _unlockEasterBadge('pause', fb);
 
   // Dynamische Codes
   if (upper === 'LVL')      { _redeemLvlCode(fb, input);      return; }
@@ -4772,7 +4840,7 @@ function sortBadges(arr) {
 return `<div class="badge-wrap">
       <div class="badge-card ${lockedClass}${adminClass}" ${adminClick}>
         <span class="badge-emoji">${b.emoji}</span>
-        <div class="badge-name">${getGenderedBadgeName(b.name, state.gender)}</div>
+${(state.gender === 'female' && b.nameFemale) ? b.nameFemale : getGenderedBadgeName(b.name, state.gender)}
         ${rarityPill}
       </div>
       <div class="badge-tooltip">
@@ -4784,7 +4852,7 @@ return `<div class="badge-wrap">
 return `<div class="badge-wrap">
       <div class="badge-card ${lockedClass}${adminClass}" ${adminClick}>
         <span class="badge-emoji">${b.emoji}</span>
-        <div class="badge-name">${getGenderedBadgeName(b.name, state.gender)}</div>
+${(state.gender === 'female' && b.nameFemale) ? b.nameFemale : getGenderedBadgeName(b.name, state.gender)}
         ${rarityPill}
       </div>
       <div class="badge-tooltip">
@@ -4938,6 +5006,14 @@ function getGenderedAchName(name, gender) {
 /* ═══════════════════════════════════════════════════════════
    NEU: ACHIEVEMENT-VITRINE TOGGLE & RENDER
    ═══════════════════════════════════════════════════════════ */
+function openVitrineInfo() {
+  const el = document.getElementById('infoText');
+  const ti = document.getElementById('infoTitle');
+  if (ti) ti.textContent = '⭐ Meine Vitrine';
+  if (el) el.innerHTML = 'Hier kannst du deine Lieblings-Achievements zur Schau stellen. Du kannst maximal <strong>drei</strong> gleichzeitig auswählen – klicke dazu auf den ⭐-Stern beim jeweiligen Achievement.<br><br>Andere Nutzer können deine Vitrine über das 👁️-Symbol in der Bestenliste anschauen.';
+  openModal('infoModal');
+}
+
 function toggleShowcase(achId) {
   if (!state.showcase) state.showcase = [];
   const idx = state.showcase.indexOf(achId);
@@ -4950,6 +5026,19 @@ function toggleShowcase(achId) {
     }
     state.showcase.push(achId);
     showToast('⭐ Zur Vitrine hinzugefügt!');
+    // Schausteller/in – erstes Mal Vitrine benutzt
+    if (!state.hasUsedVitrine) {
+      state.hasUsedVitrine = true;
+      const schAch = ACHIEVEMENTS.find(a => a.id === 'schausteller');
+      if (schAch && !state.unlockedAchievements.some(u => u.id === 'schausteller')) {
+        const gName = state.gender === 'female' ? 'Schaustellerin' : 'Schausteller';
+        state.unlockedAchievements.push({ id:'schausteller', name:gName, ts:Date.now() });
+        state.xp += schAch.xp; state.totalXP = (state.totalXP||0) + schAch.xp;
+        addLogbuchEntry({ type:'achievement', icon:'🎪', typeLabel:'Achievement',
+          title:gName, reward:'+'+schAch.xp+' XP', desc:schAch.desc, ts:Date.now() });
+        setTimeout(() => showAchievementModal(schAch, gName), 800);
+      }
+    }
   }
   saveState();
   renderAchievements();
@@ -5039,7 +5128,16 @@ const cookieUnlocked = state.unlockedAchievements.some(u => u.id === COOKIE_ACHI
     : '❓<span style="position:absolute;bottom:0;right:0;font-size:0.55rem;line-height:1">🍪</span>';
   const cookieClicks   = state.cookieAchClicks || 0;
 
+const pauseUnlocked = state.unlockedAchievements.some(u => u.id === PAUSE_ACHIEVEMENT.id);
   html += `<div class="ach-separator">🔐 Geheime Achievements</div>
+    <div class="ach-card ach-secret-special ${pauseUnlocked ? 'unlocked' : 'locked'}">
+      <div class="ach-icon-wrap">${pauseUnlocked ? PAUSE_ACHIEVEMENT.emoji : '❓'}</div>
+      <div class="ach-body">
+        <div class="ach-name">${pauseUnlocked ? PAUSE_ACHIEVEMENT.name : '???'}</div>
+        <div class="ach-desc">${pauseUnlocked ? PAUSE_ACHIEVEMENT.desc : 'Noch nicht entdeckt.'}</div>
+      </div>
+      <div class="ach-status">${pauseUnlocked ? '✅' : '🔒'}</div>
+    </div>
     <div class="ach-card ach-secret-special ${secUnlocked ? 'unlocked' : 'locked'}">
       <div class="ach-icon-wrap">${secUnlocked ? SECRET_ACHIEVEMENT.emoji : '❓'}</div>
       <div class="ach-body">
@@ -5249,6 +5347,71 @@ function filterLeaderboardLive(mod, btn) {
   renderLiveLeaderboard();
 }
 
+/** Titelfarbe je Seltenheit des Achievements */
+function _getTitleRarityColor(achId) {
+  if (!achId || !state._rarityData?.total) return 'var(--title-color)';
+  const count = state._rarityData.achCounts?.[achId] || 0;
+  const pct   = Math.round((count / state._rarityData.total) * 100);
+  if (pct >= 80) return '#3dba7a';
+  if (pct >= 60) return '#3b82f6';
+  if (pct >= 40) return '#7a8aac';
+  if (pct >= 20) return '#f59e0b';
+  return '#e05555';
+}
+
+/** Ewigkeits-Ranking: Alle User (aktiv + archiviert) */
+async function showEwigkeitsRankingLive(btn) {
+  const wrap = document.getElementById('lbTableWrap');
+  if (!wrap) return;
+  document.querySelectorAll('.lb-filter-btn').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  _lbLiveFilter = '__ewigkeit__';
+  wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">⏳ Lade Ewigkeits-Ranking…</p>';
+
+  let users = [];
+  try {
+    users = await window.firebaseGetAllUsersIncludeArchiv();
+  } catch(e) {
+    wrap.innerHTML = '<p style="color:var(--error)">Fehler beim Laden.</p>'; return;
+  }
+
+  users.sort((a, b) => (b.totalXP || b.xp || 0) - (a.totalXP || a.xp || 0));
+  if (!users.length) {
+    wrap.innerHTML = '<p style="color:var(--text-muted)">Keine Einträge.</p>'; return;
+  }
+
+  const isSuperAdmin = state._isSuperAdmin;
+  let html = `<div style="font-size:0.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:8px">
+    🌐 Ewigkeits-Ranking — Alle Teilnehmer inkl. Archiv (${users.length})
+  </div>
+  <table class="lb-table"><thead><tr>
+    <th>#</th><th></th><th>Name</th><th>Modul</th><th>XP</th><th>Abzeichen</th>${isSuperAdmin ? '<th>👁️</th>' : ''}
+  </tr></thead><tbody>`;
+
+  users.forEach((e, i) => {
+    if (!e || !e.name) return;
+    const isMe   = e.name === state.name;
+    const medal  = ['🥇','🥈','🥉'][i] || '';
+    const prestI = (e.prestige > 0) ? ((window.getPrestigeConfig||(() =>({})))(e.prestige)?.icon || '') : '';
+    const archivedBadge = e.isArchived ? ' <span style="font-size:0.60rem;color:var(--text-muted);background:rgba(255,255,255,0.05);padding:1px 5px;border-radius:4px">Archiv</span>' : '';
+    const safeEntry = JSON.stringify(e).replace(/'/g,"&#39;");
+    const titleColor = _getTitleRarityColor(e.activeTitleId);
+    const titleBefore = (e.activeTitle && e.titlePos !== 'suffix') ? `<span style="font-size:0.70rem;color:${titleColor};display:block;line-height:1.2">${e.activeTitle}</span>` : '';
+    const titleAfter  = (e.activeTitle && e.titlePos === 'suffix')  ? ` <span style="font-size:0.70rem;color:${titleColor}">${e.activeTitle}</span>` : '';
+    html += `<tr${isMe ? ' class="me"' : ''}>
+      <td class="place">${medal || (i+1)}</td>
+      <td class="prestige-icon-col">${prestI}</td>
+      <td>${titleBefore}${isMe ? '👉 ' : ''}<strong>${e.name}</strong>${archivedBadge}${titleAfter}</td>
+      <td style="font-size:0.8rem;color:var(--text-muted)">${e.module || '–'}</td>
+      <td><strong>${(e.totalXP||e.xp||0).toLocaleString('de-DE')}</strong></td>
+      <td>${e.badges || 0}</td>
+      ${isSuperAdmin ? `<td><button class="lb-eye-btn" onclick="openUserDetailLive(this)" data-entry='${safeEntry}'>👁️</button></td>` : ''}
+    </tr>`;
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
 function showModuleStatsLive(btn) {
   const wrap = document.getElementById('lbTableWrap');
   if (!wrap) return;
@@ -5321,9 +5484,9 @@ let data = [..._lbLiveData].sort((a,b) => (b.totalXP||b.xp||0) - (a.totalXP||a.x
     wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">Keine Einträge vorhanden.</p>';
     return;
   }
-  const isAdmin = state._isAdmin;
+const isSuperAdmin = state._isSuperAdmin;
 let html = `<table class="lb-table"><thead><tr>
-    <th>#</th><th></th><th>Name</th><th>Modul</th><th>XP</th><th>Abzeichen</th><th></th>
+    <th>#</th><th></th><th>Name</th><th>Modul</th><th>XP</th><th>Abzeichen</th>${isSuperAdmin ? '<th>👁️</th>' : ''}
   </tr></thead><tbody>`;
 data.forEach((e, i) => {
     if (!e || !e.name) return;                           // Null-Schutz
@@ -5332,8 +5495,9 @@ data.forEach((e, i) => {
     const prestigeIcon = (e.prestige > 0)
       ? ((window.getPrestigeConfig || (() => ({})))(e.prestige)?.icon || '') : '';
     const safeEntry = JSON.stringify(e).replace(/'/g,"&#39;");
-const titleBefore = (e.activeTitle && e.titlePos !== 'suffix') ? `<span style="font-size:0.70rem;color:var(--text-muted);display:block;line-height:1.2">${e.activeTitle}</span>` : '';
-    const titleAfter  = (e.activeTitle && e.titlePos === 'suffix')  ? ` <span style="font-size:0.70rem;color:var(--text-muted)">${e.activeTitle}</span>` : '';
+    const titleColor = _getTitleRarityColor(e.activeTitleId);
+const titleBefore = (e.activeTitle && e.titlePos !== 'suffix') ? `<span style="font-size:0.70rem;color:${titleColor};display:block;line-height:1.2">${e.activeTitle}</span>` : '';
+    const titleAfter  = (e.activeTitle && e.titlePos === 'suffix')  ? ` <span style="font-size:0.70rem;color:${titleColor}">${e.activeTitle}</span>` : '';
     html += `<tr${isMe ? ' class="me"' : ''}>
       <td class="place">${medal || (i+1)}</td>
       <td class="prestige-icon-col">${prestigeIcon}</td>
@@ -5341,7 +5505,7 @@ const titleBefore = (e.activeTitle && e.titlePos !== 'suffix') ? `<span style="f
       <td style="font-size:0.8rem;color:var(--text-muted)">${e.module || '–'}</td>
 <td><strong>${(e.totalXP||e.xp||0).toLocaleString('de-DE')}</strong></td>
       <td>${e.badges || 0}</td>
-      <td><button class="lb-eye-btn" onclick="openUserDetailLive(this)" data-entry='${safeEntry}'>👁️</button></td>
+      ${isSuperAdmin ? `<td><button class="lb-eye-btn" onclick="openUserDetailLive(this)" data-entry='${safeEntry}'>👁️</button></td>` : ''}
     </tr>`;
   });
   html += '</tbody></table>';
@@ -5854,10 +6018,12 @@ const DEV_LOG = [
   { version:'6.0', date:'06.04.2026', changes:'Bugfixes, Implementierung Modul-Challenges, Dev-Log und Logbuch.' },
   { version:'7.0', date:'18.04.2026', changes:'Bugfixes, Benutzerverwaltung und Verbesserungen in der Bestenliste.' },
   { version:'7.1', date:'19.04.2026', changes:'Bugfixes, Verbesserungen der Benutzerverwaltung, Logik-Fixes an bestimmten Abzeichen.' },
-    { version:'7.2', date:'20.04.2026', changes:'Modul-Ranking für die Bestenliste eingefügt.' },
-	  { version:'7.3', date:'21.04.2026', changes:'Bugfixes, Verbessertes Verhalten für Titel in der Bestenliste.' },
-	    { version:'7.4', date:'22.04.2026', changes:'Bugfixes, Anpassung des Verhaltens mancher Achievements, Kalenderfunktion in den Einstellungen verbessert.' },
-		  { version:'7.5', date:'23.04.2026', changes:'Bugfixes, Verhaltensverbesserung zur Fokussierung der Abzeichen Popups, letzte Anpassungen für den Pitch.' },
+  { version:'7.2', date:'20.04.2026', changes:'Modul-Ranking für die Bestenliste eingefügt.' },
+  { version:'7.3', date:'21.04.2026', changes:'Bugfixes, Verbessertes Verhalten für Titel in der Bestenliste.' },
+  { version:'7.4', date:'22.04.2026', changes:'Bugfixes, Anpassung des Verhaltens mancher Achievements, Kalenderfunktion in den Einstellungen verbessert.' },
+  { version:'7.5', date:'23.04.2026', changes:'Bugfixes, Verhaltensverbesserung zur Fokussierung der Abzeichen Popups.' },
+  { version:'8.0', date:'29.04.2026', changes:'Implementierung Ewigkeits-Ranking, Ergänzung Vitrinen-Infobox, neue Administrator-Funktionen, ABZeichen und Achievement-Verbesserungen.' },
+	
 ];
 
 function renderDevLog() {
@@ -5878,7 +6044,8 @@ function switchTab(id, btn) {
 
   if (id === 'badges')       renderBadges();
   if (id === 'achievements') { renderAchievements(); updateTitleSelector(); }
-  if (id === 'logbuch')      renderLogbuch();
+if (id === 'logbuch')      renderLogbuch();
+  if (id === 'timeline')     renderTimeline();
   if (id === 'devlog')       renderDevLog();
   if (id === 'challenges')   { renderChallenges(); syncChallengesFromSheets(); }
 }
@@ -5946,14 +6113,24 @@ function saveSettings() {
   const newName  = rawInput || state.name;   // Leerfeld → aktuellen Namen behalten
   if (!newName) { showToast('⚠️ Kein Name vorhanden.'); return; }
 
-  // Easter Egg: umbenannt?
+  // Easter Egg + Zombie-Fix: alten Firebase-Eintrag löschen bei Umbenennung
   if (newName !== state.name) {
+    const oldName = state.name;
     state.hasRenamed = true;
     _unlockEasterBadge('achwiegut', null);
+    state.name = newName;
+    saveState(); // Schreibt neuen Eintrag mit neuem Namen
+    // Alten Firebase-Eintrag entfernen (kein Zombie-Eintrag mehr)
+    if (typeof window.firebaseDeleteUser === 'function') {
+      window.firebaseDeleteUser(oldName).catch(e => console.warn('[Rename] Delete old entry:', e));
+    }
+    // Auch im Archiv prüfen und ggf. umbenennen
+    if (typeof window.firebaseSetInactive === 'undefined') {} // kein Archiv-Eintrag erwartet
+  } else {
+    state.name = newName;
+    saveState();
   }
 
-  state.name = newName;
-  saveState();
   closeModal('settingsModal');
   render();
   showToast('✅ Einstellungen gespeichert!');
@@ -6206,10 +6383,42 @@ function renderAdminCodeList() {
   if (ad) ad.textContent = state.activityPos;
 }
 
+function openSuperAdminPanel() {
+  openAdminPanel();                       // Normale Admin-Rechte zuerst
+  state._isSuperAdmin = true;            // ← Erweiterter Admin
+  const tlBtn = document.getElementById('timelineTabBtn');
+  if (tlBtn) tlBtn.style.display = '';
+  // Stern auf Diamant-Blau
+  const star = document.getElementById('adminStar');
+  if (star) { star.style.display = 'inline'; star.style.color = '#7b9cdb'; star.title = 'Admin+-Modus aktiviert'; }
+  showToast('💎 Super-Admin-Konsole aktiviert!');
+}
+
+async function renderTimeline() {
+  const el = document.getElementById('timelineList');
+  if (!el) return;
+  el.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">⏳ Lade…</p>';
+  const items = typeof window.firebaseGetTimeline === 'function' ? await window.firebaseGetTimeline(200) : [];
+  if (!items.length) { el.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">Noch keine Einträge.</p>'; return; }
+  const fmt = ts => ts ? new Date(ts).toLocaleString('de-DE',{dateStyle:'short',timeStyle:'short'}) : '–';
+  el.innerHTML = items.map(it => {
+    const xpStr = it.xp > 0 ? `<span style="color:var(--prestige-color);font-weight:700">+${it.xp.toLocaleString('de-DE')} XP</span>` : '';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:5px 10px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:0.81rem">
+      <span style="color:var(--text-muted);flex-shrink:0;min-width:100px">${fmt(it.ts)}</span>
+      <span style="font-weight:700;min-width:90px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.name||'?'}</span>
+      <span style="color:var(--text-muted);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${it.title||it.label||''}</span>
+      ${xpStr}
+    </div>`;
+  }).join('');
+}
+
 function openAdminPanel() {
-  document.getElementById('adminPanel')?.classList.add('visible');
+document.getElementById('adminPanel')?.classList.add('visible');
   state._isAdmin = true;   // ← Admin-Modus aktivieren
   renderAdminCodeList();
+  // Admin-Stern (gold) anzeigen
+  const adminStarEl = document.getElementById('adminStar');
+  if (adminStarEl) { adminStarEl.style.display = 'inline'; adminStarEl.style.color = '#f59e0b'; adminStarEl.title = 'Admin-Modus aktiviert'; }
   showToast('🛡️ Admin-Konsole aktiviert!');
 
   // Admin-Badge-Hint
@@ -6238,8 +6447,12 @@ function closeAdminPanel() {
     showToast('🗑️ Admin-Werte zurückgesetzt.');
   }
 state._isAdmin = false;   // ← Admin-Modus deaktivieren
+  state._isSuperAdmin = false; // ← Super-Admin zurücksetzen
   document.getElementById('adminPanel')?.classList.remove('visible');
   document.getElementById('adminBadgeHint').style.display = 'none';
+  // Admin-Stern verstecken
+  const starEl = document.getElementById('adminStar');
+  if (starEl) starEl.style.display = 'none';
   // Bestenliste sofort ohne Admin-Augen neu rendern
   if (_lbAllEntries.length > 0) {
     _renderLeaderboardTable(_lbAllEntries, false);
@@ -6247,6 +6460,9 @@ state._isAdmin = false;   // ← Admin-Modus deaktivieren
     // NEU: Benutzerverwaltungs-Tab ausblenden
   const umBtn = document.getElementById('userMgmtTabBtn');
   if (umBtn) umBtn.style.display = 'none';
+  // Timeline-Tab ausblenden
+  const tlBtn = document.getElementById('timelineTabBtn');
+  if (tlBtn) tlBtn.style.display = 'none';
 }
 
 function generateHash() {
