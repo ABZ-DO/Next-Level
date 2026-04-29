@@ -126,7 +126,7 @@ body {
 #actPointer { position:absolute;width:22px;height:22px;background:#fff;border-radius:50%;border:3px solid rgba(0,0,0,0.2);box-shadow:0 2px 8px rgba(0,0,0,0.4);transform:translate(-50%,-50%);top:50%;transition:left 0.6s cubic-bezier(0.34,1.56,0.64,1);z-index:1; }
 
 /* Admin-Stern */
-#adminStar { display:none;font-size:1.1rem;line-height:1;cursor:default;transition:color .3s;margin-left:4px;filter:drop-shadow(0 0 4px currentColor); }
+#adminStar { display:none;font-size:2.2rem;line-height:1;cursor:default;transition:color .3s,filter .3s;filter:drop-shadow(0 0 6px currentColor);flex-shrink:0; }
 
 /* ══════════════════════════════════════════════════════════
    4. ONBOARDING (Name-Eingabe) — erweitert mit Anrede & Modul
@@ -2060,9 +2060,9 @@ window.firebaseCreateTestUser = async function(data) {
     <div><h1>Next Level</h1><small>Dein Begleiter im Ausbildungszentrum.</small></div>
   </div>
   <div class="header-right">
-<div class="profile-pic-wrap" style="position:relative;display:inline-flex;align-items:center">
-      <div id="profilePicCircle">👤</div>
+<div class="profile-pic-wrap" style="display:inline-flex;align-items:center;gap:6px">
       <span id="adminStar" title="Admin-Modus aktiviert">⭐</span>
+      <div id="profilePicCircle">👤</div>
     </div>
     <div class="header-user">
 <div class="username-wrap">
@@ -5007,11 +5007,41 @@ function getGenderedAchName(name, gender) {
    NEU: ACHIEVEMENT-VITRINE TOGGLE & RENDER
    ═══════════════════════════════════════════════════════════ */
 function openVitrineInfo() {
-  const el = document.getElementById('infoText');
-  const ti = document.getElementById('infoTitle');
-  if (ti) ti.textContent = '⭐ Meine Vitrine';
-  if (el) el.innerHTML = 'Hier kannst du deine Lieblings-Achievements zur Schau stellen. Du kannst maximal <strong>drei</strong> gleichzeitig auswählen – klicke dazu auf den ⭐-Stern beim jeweiligen Achievement.<br><br>Andere Nutzer können deine Vitrine über das 👁️-Symbol in der Bestenliste anschauen.';
-  openModal('infoModal');
+  const ex = document.getElementById('_vitrineInfoOv');
+  if (ex) ex.remove();
+  const ov = document.createElement('div');
+  ov.id = '_vitrineInfoOv';
+  ov.style.cssText = 'position:fixed;inset:0;z-index:9500;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+  ov.innerHTML = `
+    <div style="background:var(--navy-light);border:1px solid var(--prestige-color);border-radius:18px;padding:28px 32px;max-width:400px;width:92%;box-shadow:var(--shadow);animation:popIn .3s ease both;font-family:var(--font-main)">
+      <h3 style="font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--prestige-color);margin-bottom:16px;display:flex;align-items:center;gap:8px">⭐ Meine Vitrine</h3>
+      <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:20px">
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="font-size:1.4rem;flex-shrink:0">🎪</span>
+          <div>
+            <div style="font-weight:800;font-size:0.86rem;color:var(--cream);margin-bottom:3px">Deine Bühne</div>
+            <div style="font-size:0.81rem;color:var(--text-muted);line-height:1.5">Stelle deine Lieblings-Achievements zur Schau – wähle bis zu <strong style="color:var(--prestige-color)">3</strong> aus.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="font-size:1.4rem;flex-shrink:0">⭐</span>
+          <div>
+            <div style="font-weight:800;font-size:0.86rem;color:var(--cream);margin-bottom:3px">So geht's</div>
+            <div style="font-size:0.81rem;color:var(--text-muted);line-height:1.5">Klicke beim Achievement auf den <strong style="color:var(--prestige-color)">⭐-Stern</strong>, um es hinzuzufügen oder zu entfernen.</div>
+          </div>
+        </div>
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <span style="font-size:1.4rem;flex-shrink:0">👁️</span>
+          <div>
+            <div style="font-weight:800;font-size:0.86rem;color:var(--cream);margin-bottom:3px">Sichtbar für alle</div>
+            <div style="font-size:0.81rem;color:var(--text-muted);line-height:1.5">Andere können deine Vitrine über das <strong style="color:var(--prestige-color)">👁️-Symbol</strong> in der Bestenliste anschauen.</div>
+          </div>
+        </div>
+      </div>
+      <button class="btn btn-gold btn-wide" onclick="document.getElementById('_vitrineInfoOv').remove()">✓ Verstanden!</button>
+    </div>`;
+  ov.addEventListener('click', ev => { if (ev.target === ov) ov.remove(); });
+  document.body.appendChild(ov);
 }
 
 function toggleShowcase(achId) {
@@ -5055,9 +5085,21 @@ function renderVitrine() {
   row.innerHTML = sc.map(id => {
     const a = ACHIEVEMENTS.find(x => x.id === id);
     if (!a) return '';
+    const rd = state._rarityData;
+    let borderCol = 'var(--prestige-color)', bgCol = 'rgba(255,255,255,0.05)';
+    if (rd?.total >= 2) {
+      const count = rd.achCounts?.[id] || 0;
+      const pct   = Math.round((count / rd.total) * 100);
+      if (pct >= 80) { borderCol='rgba(61,186,122,0.7)';  bgCol='rgba(61,186,122,0.10)'; }
+      else if (pct >= 60) { borderCol='rgba(59,130,246,0.7)';  bgCol='rgba(59,130,246,0.10)'; }
+      else if (pct >= 40) { borderCol='rgba(120,138,172,0.7)'; bgCol='rgba(120,138,172,0.10)'; }
+      else if (pct >= 20) { borderCol='rgba(245,158,11,0.7)';  bgCol='rgba(245,158,11,0.10)'; }
+      else                { borderCol='rgba(224,85,85,0.7)';   bgCol='rgba(224,85,85,0.10)'; }
+    }
     return `<div title="${a.name}" style="width:42px;height:42px;border-radius:10px;
-      background:rgba(255,255,255,0.05);border:1.5px solid var(--prestige-color);
-      display:flex;align-items:center;justify-content:center;font-size:1.3rem;cursor:default">${a.emoji}</div>`;
+      background:${bgCol};border:2px solid ${borderCol};
+      display:flex;align-items:center;justify-content:center;font-size:1.3rem;cursor:default;
+      box-shadow:0 0 8px ${bgCol}">${a.emoji}</div>`;
   }).join('');
 }
 
@@ -5698,7 +5740,7 @@ function openUserDetailLive(btn) {
   let e;
   try { e = JSON.parse(btn.dataset.entry.replace(/&#39;/g, "'")); } catch { return; }
 
-  const isAdmin = state._isAdmin;
+  const isAdmin = state._isSuperAdmin;
   const pc      = getPrestigeConfig(e.prestige || 0);
 
   // Modul: Langversion aus Reverse-Lookup
@@ -5718,14 +5760,26 @@ function openUserDetailLive(btn) {
     `<div style="font-size:0.65rem;color:var(--text-muted);text-transform:uppercase;
       letter-spacing:0.08em;margin:13px 0 5px;font-family:var(--font-main)">${icon} ${lbl}</div>`;
 
-  // Vitrine — leere Slots = wirklich leer
+// Vitrine — leere Slots = wirklich leer; farbige Rahmen je Seltenheit
   const showcaseHtml = [0,1,2].map(i => {
     const a = (e.showcase||[])[i];
     if (!a) return `<div style="width:50px;height:50px;border-radius:11px;
       background:rgba(255,255,255,0.03);border:1.5px dashed rgba(120,138,172,0.22)"></div>`;
+    const rd = state._rarityData;
+    let bCol = 'var(--prestige-color)', bgC = 'rgba(255,255,255,0.06)';
+    if (rd?.total >= 2) {
+      const cnt = rd.achCounts?.[a.id] || 0;
+      const pct = Math.round((cnt / rd.total) * 100);
+      if (pct >= 80) { bCol='rgba(61,186,122,0.8)';  bgC='rgba(61,186,122,0.12)'; }
+      else if (pct >= 60) { bCol='rgba(59,130,246,0.8)';  bgC='rgba(59,130,246,0.12)'; }
+      else if (pct >= 40) { bCol='rgba(120,138,172,0.8)'; bgC='rgba(120,138,172,0.12)'; }
+      else if (pct >= 20) { bCol='rgba(245,158,11,0.8)';  bgC='rgba(245,158,11,0.12)'; }
+      else                { bCol='rgba(224,85,85,0.8)';   bgC='rgba(224,85,85,0.12)'; }
+    }
     return `<div title="${a.name}" style="width:50px;height:50px;border-radius:11px;
-      background:rgba(255,255,255,0.06);border:1.5px solid var(--prestige-color);
-      display:flex;align-items:center;justify-content:center;font-size:1.4rem">${a.emoji}</div>`;
+      background:${bgC};border:2px solid ${bCol};
+      display:flex;align-items:center;justify-content:center;font-size:1.4rem;
+      box-shadow:0 0 8px ${bgC}">${a.emoji}</div>`;
   }).join('');
 
   // Profilbild
@@ -6388,10 +6442,14 @@ function openSuperAdminPanel() {
   state._isSuperAdmin = true;            // ← Erweiterter Admin
   const tlBtn = document.getElementById('timelineTabBtn');
   if (tlBtn) tlBtn.style.display = '';
-  // Stern auf Diamant-Blau
+// Stern auf Diamant-Blau (gesamter Stern, nicht nur Glühen)
   const star = document.getElementById('adminStar');
-  if (star) { star.style.display = 'inline'; star.style.color = '#7b9cdb'; star.title = 'Admin+-Modus aktiviert'; }
-  showToast('💎 Super-Admin-Konsole aktiviert!');
+  if (star) {
+    star.style.display = 'inline';
+    star.style.color = '#5b8dd9';
+    star.style.filter = 'drop-shadow(0 0 8px #5b8dd9) drop-shadow(0 0 16px #3b6abf)';
+    star.title = 'Admin+-Modus aktiviert';
+  }
 }
 
 async function renderTimeline() {
