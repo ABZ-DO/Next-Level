@@ -4922,8 +4922,8 @@ function sortBadges(arr) {
     if (b.cookie) {
 return `<div class="badge-wrap">
       <div class="badge-card ${lockedClass}${adminClass}" ${adminClick}>
-        <span class="badge-emoji">${b.emoji}</span>
-${(state.gender === 'female' && b.nameFemale) ? b.nameFemale : getGenderedBadgeName(b.name, state.gender)}
+<span class="badge-emoji">${b.emoji}</span>
+        <div class="badge-name">${(state.gender === 'female' && b.nameFemale) ? b.nameFemale : getGenderedBadgeName(b.name, state.gender)}</div>
         ${rarityPill}
       </div>
       <div class="badge-tooltip">
@@ -4934,8 +4934,8 @@ ${(state.gender === 'female' && b.nameFemale) ? b.nameFemale : getGenderedBadgeN
     }
 return `<div class="badge-wrap">
       <div class="badge-card ${lockedClass}${adminClass}" ${adminClick}>
-        <span class="badge-emoji">${b.emoji}</span>
-${(state.gender === 'female' && b.nameFemale) ? b.nameFemale : getGenderedBadgeName(b.name, state.gender)}
+<span class="badge-emoji">${b.emoji}</span>
+        <div class="badge-name">${(state.gender === 'female' && b.nameFemale) ? b.nameFemale : getGenderedBadgeName(b.name, state.gender)}</div>
         ${rarityPill}
       </div>
       <div class="badge-tooltip">
@@ -5100,7 +5100,7 @@ const SURVEY_SUBMIT_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSdp3TAloXEei
 // Fragen: { id: Google-entry-ID, label: Anzeige, type: 'text'|'radio'|'textarea', options: [...] }
 // entry-IDs aus dem Google-Form-URL entnehmen (Inspect Element → name="entry.XXXXXXX")
 const SURVEY_QUESTIONS = [
-  { id: 'entry.1', label: 'Wie gefällt dir Next Level bisher?', type: 'radio',
+  { id: 'entry.779418467', label: 'Wie gefällt dir Next Level bisher?', type: 'radio',
     options: ['⭐ Sehr gut', '🙂 Gut', '😐 Geht so', '😕 Nicht so gut'] },
   { id: 'entry.2', label: 'Was motiviert dich am meisten?', type: 'radio',
     options: ['🏅 Abzeichen sammeln', '📊 Bestenliste', '🎯 Challenges', '⚡ XP & Ränge', '👥 Mit anderen vergleichen'] },
