@@ -1351,6 +1351,25 @@ window.firebaseGetAllUsersIncludeArchiv = async function() {
   return users;
 };
 
+/** Umfrage: Antwort eines Nutzers speichern */
+window.firebaseSaveUmfrage = async function(name, answers) {
+  try {
+    await _db.ref('umfrage/' + _fbKey(name)).set({
+      name, answers, ts: Date.now()
+    });
+  } catch(e) { console.warn('Umfrage speichern:', e); }
+};
+
+/** Umfrage: Alle Antworten laden (für Admin-Tab) */
+window.firebaseGetUmfrage = async function() {
+  try {
+    const snap = await _db.ref('umfrage').once('value');
+    const results = [];
+    snap.forEach(child => { const v = child.val(); if (v) results.push(v); });
+    return results.sort((a, b) => (b.ts||0) - (a.ts||0));
+  } catch(e) { return []; }
+};
+
 /** Timeline: XP-Ereignis global loggen */
 window.firebaseLogTimeline = async function(entry) {
   if (!entry || !entry.name) return;
@@ -1780,34 +1799,18 @@ window.firebaseCreateTestUser = async function(data) {
 <!-- UMFRAGE-MODAL (erscheint ab 1000 XP, Pflicht) -->
 <div id="surveyModal" class="modal-overlay hidden" data-modal="survey" tabindex="-1" style="z-index:10500" onclick="event.stopPropagation()">
   <div style="background:linear-gradient(160deg,var(--navy-light),var(--navy-mid));border:2px solid var(--prestige-color);
-    border-radius:22px;padding:24px 28px;max-width:680px;width:96%;box-shadow:0 0 60px var(--prestige-glow),var(--shadow);
-    animation:popIn .5s cubic-bezier(0.175,0.885,0.32,1.275) both;font-family:var(--font-main);max-height:96vh;
-    overflow-y:auto;margin:12px auto;display:flex;flex-direction:column;gap:14px">
-
-    <div style="font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--prestige-color)">
-      🎉 1.000 XP erreicht — Herzlichen Glückwunsch!
+    border-radius:22px;padding:28px 32px;max-width:520px;width:96%;box-shadow:0 0 60px var(--prestige-glow),var(--shadow);
+    animation:popIn .5s cubic-bezier(0.175,0.885,0.32,1.275) both;font-family:var(--font-main);
+    max-height:92vh;overflow-y:auto;margin:16px auto">
+    <div style="font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--prestige-color);margin-bottom:6px">
+      🎉 1.000 XP — Herzlichen Glückwunsch!
     </div>
-    <p style="color:var(--text-muted);font-size:0.85rem;line-height:1.6;margin:0">
-      Du hast einen tollen Meilenstein erreicht! 🚀 Bitte nimm dir kurz Zeit für unsere kleine Umfrage —
-      sie hilft uns, Next Level für euch noch besser zu machen.
+    <p style="color:var(--text-muted);font-size:0.84rem;margin-bottom:18px;line-height:1.6">
+      Ein toller Meilenstein! Bevor du weiterlegst, freuen wir uns über kurzes Feedback. Das dauert nur eine Minute. 🚀
     </p>
-
-    <!-- Google Forms iframe -->
-    <div style="border-radius:14px;overflow:hidden;border:1px solid var(--card-border)">
-      <iframe
-        src="https://docs.google.com/forms/d/e/1FAIpQLSdp3TAloXEeidYxKCcJz-rjVrzkogIrzT78BF2t4T_7VWOqXg/viewform?embedded=true"
-        width="100%" height="520" frameborder="0" marginheight="0" marginwidth="0"
-        style="display:block;background:#fff">
-        Wird geladen…
-      </iframe>
-    </div>
-
-    <p style="color:var(--text-muted);font-size:0.75rem;text-align:center;margin:0">
-      Scrolle im Formular nach unten und klicke auf „Senden". Danach auf „Ich habe teilgenommen".
-    </p>
-
-    <div style="display:flex;flex-direction:column;gap:8px">
-      <button class="btn btn-gold btn-wide" onclick="_surveyConfirmDone()">✅ Ich habe teilgenommen</button>
+    <div id="surveyQWrap"></div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
+      <button class="btn btn-gold btn-wide" id="surveySubmitBtn" onclick="_submitSurveyNative()">✅ Absenden</button>
       <button class="btn btn-ghost btn-wide" onclick="_surveyLater()" style="font-size:0.82rem;opacity:0.75">⏰ Ich nehme später teil</button>
     </div>
   </div>
@@ -2261,7 +2264,8 @@ window.firebaseCreateTestUser = async function(data) {
       <button class="tab-btn" onclick="switchTab('achievements',this)">🏆 Achievements</button>
       <button class="tab-btn" onclick="switchTab('leaderboard',this)">📊 Bestenliste</button>
 <button class="tab-btn" id="userMgmtTabBtn" onclick="switchTab('usermgmt',this)" style="display:none">👥 Benutzerverwaltung</button>
-      <button class="tab-btn" id="timelineTabBtn" onclick="switchTab('timeline',this)" style="display:none">📡 Timeline</button>
+<button class="tab-btn" id="timelineTabBtn" onclick="switchTab('timeline',this)" style="display:none">📡 Timeline</button>
+      <button class="tab-btn" id="umfrageTabBtn" onclick="switchTab('umfrage',this)" style="display:none">📋 Umfrage</button>
       <button class="tab-btn" onclick="switchTab('backup',this)">💾 Backup</button>
       <button class="tab-btn" onclick="switchTab('logbuch',this)">📖 Logbuch</button>
       <button class="tab-btn" onclick="switchTab('devlog',this)">📋 Dev-Log</button>
@@ -2548,7 +2552,19 @@ window.firebaseCreateTestUser = async function(data) {
 </div>
 </div><!-- Ende Tab Leaderboard -->
 
-<!-- TAB: Timeline (nur Super-Admin) -->
+<!-- TAB: Umfrage-Ergebnisse (nur Admin) -->
+  <div class="tab-panel" id="tab-umfrage">
+    <div class="tile-title"><span class="icon">📋</span> Umfrage-Ergebnisse</div>
+    <p style="color:var(--text-muted);font-size:0.84rem;margin-bottom:12px">Antworten aller Nutzer ab 1.000 XP.</p>
+    <div style="display:flex;gap:8px;margin-bottom:14px">
+      <button class="btn btn-ghost btn-sm" onclick="renderUmfrageResults()">🔄 Aktualisieren</button>
+    </div>
+    <div id="umfrageResultsWrap">
+      <p style="color:var(--text-muted);font-size:0.84rem">⏳ Lade Ergebnisse…</p>
+    </div>
+  </div>
+
+  <!-- TAB: Timeline (nur Super-Admin) -->
   <div class="tab-panel" id="tab-timeline">
     <div class="tile-title"><span class="icon">📡</span> Globale Timeline</div>
     <p style="color:var(--text-muted);font-size:0.84rem;margin-bottom:12px">Alle XP-Ereignisse aller Nutzer*innen in Echtzeit.</p>
@@ -5104,24 +5120,82 @@ function getGenderedAchName(name, gender) {
 function openVitrineInfo() { openModal('vitrineInfoModal'); }
 
 /* ═══════════════════════════════════════════════════════════
-   UMFRAGE (1000 XP Meilenstein)
+   UMFRAGE — Native Fragen, Ergebnisse in Firebase
    ═══════════════════════════════════════════════════════════ */
-function _surveyConfirmDone() {
-  // Nutzer bestätigt, dass er teilgenommen hat
+const UMFRAGE_FRAGEN = [
+  { id: 'q1', type: 'radio', label: 'Wie gefällt dir Next Level bisher?',
+    options: ['⭐⭐⭐⭐⭐ Sehr gut', '⭐⭐⭐⭐ Gut', '⭐⭐⭐ Geht so', '⭐⭐ Nicht so gut'] },
+  { id: 'q2', type: 'radio', label: 'Was motiviert dich am meisten?',
+    options: ['🏅 Abzeichen sammeln', '📊 Bestenliste', '🎯 Challenges', '⚡ XP & Ränge', '👥 Vergleich mit anderen'] },
+  { id: 'q3', type: 'radio', label: 'Wie häufig öffnest du Next Level?',
+    options: ['Täglich', 'Mehrmals pro Woche', 'Einmal pro Woche', 'Seltener'] },
+  { id: 'q4', type: 'textarea', label: 'Was würdest du dir noch wünschen oder verbessern?' },
+];
+
+window._umfrageAnswers = {};
+
+function _renderSurveyNative() {
+  const wrap = document.getElementById('surveyQWrap');
+  if (!wrap) return;
+  window._umfrageAnswers = {};
+  wrap.innerHTML = UMFRAGE_FRAGEN.map(q => {
+    if (q.type === 'radio') {
+      const opts = q.options.map(o => `
+        <label data-qid="${q.id}" style="display:flex;align-items:center;gap:9px;padding:8px 12px;
+          background:rgba(255,255,255,0.04);border:1.5px solid rgba(120,138,172,0.2);
+          border-radius:9px;cursor:pointer;font-size:0.83rem;transition:border-color .15s,background .15s"
+          onclick="document.querySelectorAll('[data-qid=\\'${q.id}\\']').forEach(l=>{
+            l.style.borderColor='rgba(120,138,172,0.2)';l.style.background='rgba(255,255,255,0.04)'});
+            this.style.borderColor='var(--prestige-color)';this.style.background='rgba(120,138,172,0.10)';
+            window._umfrageAnswers['${q.id}']='${o.replace(/'/g,"\\'").replace(/"/g,'\\"')}'"
+          >
+          <input type="radio" name="${q.id}" value="${o}" style="accent-color:var(--prestige-color)"> ${o}
+        </label>`).join('');
+      return `<div style="margin-bottom:15px">
+        <div style="font-weight:800;font-size:0.85rem;color:var(--cream);margin-bottom:7px">${q.label}</div>
+        <div style="display:flex;flex-direction:column;gap:5px">${opts}</div>
+      </div>`;
+    }
+    if (q.type === 'textarea') {
+      return `<div style="margin-bottom:15px">
+        <div style="font-weight:800;font-size:0.85rem;color:var(--cream);margin-bottom:7px">${q.label}</div>
+        <textarea oninput="window._umfrageAnswers['${q.id}']=this.value" placeholder="Dein Feedback (optional)…"
+          style="width:100%;min-height:75px;padding:9px 12px;background:var(--navy);border:1.5px solid var(--slate);
+          border-radius:10px;color:var(--cream);font-family:var(--font-main);font-size:0.83rem;
+          resize:vertical;outline:none;transition:border-color .2s"
+          onfocus="this.style.borderColor='var(--prestige-color)'"
+          onblur="this.style.borderColor='var(--slate)'"></textarea>
+      </div>`;
+    }
+    return '';
+  }).join('');
+}
+
+async function _submitSurveyNative() {
+  const missing = UMFRAGE_FRAGEN.filter(q => q.type === 'radio' && !window._umfrageAnswers[q.id]);
+  if (missing.length) {
+    showToast(`⚠️ Bitte noch ${missing.length} Frage${missing.length > 1 ? 'n' : ''} beantworten!`);
+    return;
+  }
+  const btn = document.getElementById('surveySubmitBtn');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Speichere…'; }
+
+  if (typeof window.firebaseSaveUmfrage === 'function') {
+    await window.firebaseSaveUmfrage(state.name || '?', { ...window._umfrageAnswers });
+  }
   state.surveyDone = true;
   saveState();
   closeModal('surveyModal');
-  showToast('✅ Danke für deine Teilnahme!');
+  showToast('✅ Danke für dein Feedback!');
+  fireBigConfetti();
 }
 
 function _surveyLater() {
-  // Schließen ohne als erledigt zu markieren → erscheint beim nächsten XP wieder
   closeModal('surveyModal');
   showToast('⏰ Bis später! Die Umfrage erscheint beim nächsten XP erneut.');
 }
 
 function closeSurveyModal() {
-  // Nur aufrufbar nach bestätigter Teilnahme (Button im Modal)
   if (!state.surveyDone) { _surveyLater(); return; }
   closeModal('surveyModal');
 }
@@ -5131,6 +5205,7 @@ function checkSurveyTrigger() {
   if ((state.totalXP || state.xp || 0) >= 1000) {
     const modal = document.getElementById('surveyModal');
     if (modal && modal.classList.contains('hidden')) {
+      _renderSurveyNative();
       openModal('surveyModal');
       setTimeout(() => modal.focus(), 50);
     }
@@ -5504,6 +5579,89 @@ function _getTitleRarityColor(achId) {
 }
 
 /** Ewigkeits-Ranking: Alle User (aktiv + archiviert) */
+async function renderUmfrageResults() {
+  const wrap = document.getElementById('umfrageResultsWrap');
+  if (!wrap) return;
+  wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">⏳ Lade…</p>';
+
+  const data = typeof window.firebaseGetUmfrage === 'function'
+    ? await window.firebaseGetUmfrage() : [];
+
+  if (!data.length) {
+    wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">Noch keine Antworten vorhanden.</p>';
+    return;
+  }
+
+  const fmt = ts => {
+    const d = new Date(ts);
+    return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+  };
+
+  // Auswertung pro Frage
+  let html = `<div style="font-size:0.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;
+    letter-spacing:0.08em;margin-bottom:12px">📊 ${data.length} Antwort${data.length !== 1 ? 'en' : ''} gesamt</div>`;
+
+  UMFRAGE_FRAGEN.forEach(q => {
+    html += `<div style="margin-bottom:20px;padding:14px 16px;background:rgba(255,255,255,0.03);
+      border:1px solid var(--card-border);border-radius:12px">
+      <div style="font-weight:800;font-size:0.86rem;color:var(--cream);margin-bottom:10px">${q.label}</div>`;
+
+    if (q.type === 'radio') {
+      // Zähle Optionen
+      const counts = {};
+      q.options.forEach(o => counts[o] = 0);
+      data.forEach(r => { const a = r.answers?.[q.id]; if (a && counts[a] !== undefined) counts[a]++; });
+      const max = Math.max(...Object.values(counts), 1);
+      html += Object.entries(counts).map(([opt, cnt]) => {
+        const pct = Math.round((cnt / max) * 100);
+        const pctOfTotal = data.length > 0 ? Math.round((cnt / data.length) * 100) : 0;
+        return `<div style="margin-bottom:7px">
+          <div style="display:flex;justify-content:space-between;font-size:0.79rem;margin-bottom:3px">
+            <span style="color:var(--text-muted)">${opt}</span>
+            <span style="font-weight:800;color:var(--prestige-color)">${cnt} (${pctOfTotal}%)</span>
+          </div>
+          <div style="background:rgba(255,255,255,0.07);border-radius:50px;height:8px;overflow:hidden">
+            <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,rgba(90,106,138,0.6),var(--prestige-color));
+              border-radius:50px;transition:width .5s"></div>
+          </div>
+        </div>`;
+      }).join('');
+
+    } else if (q.type === 'textarea') {
+      const answers = data.map(r => r.answers?.[q.id]).filter(Boolean);
+      if (!answers.length) {
+        html += `<p style="color:var(--text-muted);font-size:0.81rem">Keine Freitextantworten.</p>`;
+      } else {
+        html += answers.map((a, i) => {
+          const entry = data.find(r => r.answers?.[q.id] === a);
+          return `<div style="padding:7px 10px;background:rgba(255,255,255,0.04);border-radius:8px;
+            margin-bottom:5px;font-size:0.81rem">
+            <span style="color:var(--text-muted);font-size:0.70rem">${entry?.name || '?'} · ${fmt(entry?.ts||0)} — </span>
+            ${a}
+          </div>`;
+        }).join('');
+      }
+    }
+    html += `</div>`;
+  });
+
+  // Einzelne Antworten (Tabelle)
+  html += `<div style="font-size:0.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;
+    letter-spacing:0.08em;margin:16px 0 8px">📝 Alle Einzel-Antworten</div>
+    <div style="display:flex;flex-direction:column;gap:5px">` +
+    data.map(r => `<div style="padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:0.79rem;
+      border-left:2px solid var(--prestige-color)">
+      <strong style="color:var(--prestige-color)">${r.name}</strong>
+      <span style="color:var(--text-muted);margin-left:8px">${fmt(r.ts)}</span>
+      ${UMFRAGE_FRAGEN.filter(q => q.type === 'radio').map(q =>
+        `<span style="color:var(--text-muted);margin-left:8px">· ${r.answers?.[q.id] || '–'}</span>`
+      ).join('')}
+    </div>`).join('') +
+    `</div>`;
+
+  wrap.innerHTML = html;
+}
+
 function scrollToMeInEwigkeit() {
   const meRow = document.getElementById('ewigkeitMeRow');
   if (!meRow) { showToast('⚠️ Du bist nicht im Ewigkeits-Ranking.'); return; }
@@ -6215,7 +6373,8 @@ function switchTab(id, btn) {
   if (id === 'badges')       renderBadges();
   if (id === 'achievements') { renderAchievements(); updateTitleSelector(); }
 if (id === 'logbuch')      renderLogbuch();
-  if (id === 'timeline')     renderTimeline();
+if (id === 'timeline')     renderTimeline();
+  if (id === 'umfrage')      renderUmfrageResults();
   if (id === 'devlog')       renderDevLog();
   if (id === 'challenges')   { renderChallenges(); syncChallengesFromSheets(); }
 }
@@ -6635,9 +6794,12 @@ document.getElementById('adminPanel')?.classList.add('visible');
   // Streak + Activity Displays
   _setEl('adminStreakDisplay',   String(state.streakFactor   || 0));
   _setEl('adminActivityDisplay', String(state.activityPos || 20));
-  // NEU: Benutzerverwaltungs-Tab einblenden
+// NEU: Benutzerverwaltungs-Tab einblenden
   const umBtn = document.getElementById('userMgmtTabBtn');
   if (umBtn) umBtn.style.display = '';
+  // Umfrage-Tab einblenden
+  const ufrBtn = document.getElementById('umfrageTabBtn');
+  if (ufrBtn) ufrBtn.style.display = '';
 }
 
 function closeAdminPanel() {
@@ -6669,8 +6831,12 @@ state._isAdmin = false;   // ← Admin-Modus deaktivieren
   const umBtn = document.getElementById('userMgmtTabBtn');
   if (umBtn) umBtn.style.display = 'none';
   // Timeline-Tab ausblenden
+// Timeline-Tab ausblenden
   const tlBtn = document.getElementById('timelineTabBtn');
   if (tlBtn) tlBtn.style.display = 'none';
+  // Umfrage-Tab ausblenden
+  const ufrBtn2 = document.getElementById('umfrageTabBtn');
+  if (ufrBtn2) ufrBtn2.style.display = 'none';
 }
 
 function generateHash() {
