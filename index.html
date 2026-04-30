@@ -2567,7 +2567,8 @@ window.firebaseCreateTestUser = async function(data) {
     <div class="tile-title"><span class="icon">📋</span> Umfrage-Ergebnisse</div>
     <p style="color:var(--text-muted);font-size:0.84rem;margin-bottom:12px">Antworten aller Nutzer ab 1.000 XP.</p>
     <div style="display:flex;gap:8px;margin-bottom:14px">
-      <button class="btn btn-ghost btn-sm" onclick="renderUmfrageResults()">🔄 Aktualisieren</button>
+<button class="btn btn-ghost btn-sm" onclick="renderUmfrageResults()">🔄 Aktualisieren</button>
+      <button class="btn btn-ghost btn-sm" onclick="adminForceShowSurvey()" style="border-color:var(--warning);color:var(--warning)">🔧 Umfrage anzeigen & testen</button>
     </div>
     <div id="umfrageResultsWrap">
       <p style="color:var(--text-muted);font-size:0.84rem">⏳ Lade Ergebnisse…</p>
@@ -4453,8 +4454,10 @@ function checkAchievements() {
   // Secret Achievement: alle Wochentage als Schultag
   if (Object.values(state.schoolDays).every(Boolean)) {
     const secId = SECRET_ACHIEVEMENT.id;
-    if (!state.unlockedAchievements.some(u => u.id === secId)) {
+if (!state.unlockedAchievements.some(u => u.id === secId)) {
       state.unlockedAchievements.push({ id:secId, ts:Date.now() });
+      addLogbuchEntry({ type:'achievement', icon:'😅', typeLabel:'Geheimes Achievement',
+        title:'Erwischt!', reward:'', desc:SECRET_ACHIEVEMENT.desc, ts:Date.now() });
       newAchs.push(SECRET_ACHIEVEMENT);
     }
   }
@@ -5142,23 +5145,35 @@ function openVitrineInfo() { openModal('vitrineInfoModal'); }
    UMFRAGE — Native Fragen, Ergebnisse in Firebase
    ═══════════════════════════════════════════════════════════ */
 const UMFRAGE_FRAGEN = [
-  { id:'q1', type:'stars', label:'Wie gefällt dir Next Level bisher?', max:5,
-    labels:['Überhaupt nicht','','','','Sehr gut'] },
-  { id:'q1t', type:'textarea', label:'Bitte begründe deine Auswahl kurz.', placeholder:'Deine Begründung…' },
-  { id:'q2', type:'scale', label:'Wie intuitiv findest du die Bedienung von Next Level?', min:1, max:5,
-    minLabel:'Total verwirrend', maxLabel:'Kinderleicht' },
-  { id:'q3', type:'radio', label:'Wie häufig interagierst du mit Next Level?',
-    options:['Sehr selten','Kaum','Hin und wieder','Regelmäßig','Täglich','Mehrmals täglich'] },
-  { id:'q4', type:'radio', label:'Welches Element macht dir am meisten Spaß?',
+  { id:'q1',  type:'stars',            label:'Wie gefällt dir Next Level bisher?', max:5,
+    starLabels:['Überhaupt nicht','Nicht so gut','Geht so','Gut','Sehr gut'] },
+  { id:'q1t', type:'sub_textarea',     label:'Bitte begründe deine Auswahl kurz.', placeholder:'Deine Begründung…' },
+  { id:'q2',  type:'emoji_scale',      label:'Wie intuitiv findest du die Bedienung von Next Level?',
+    options:[
+      {val:'1', emoji:'😵‍💫', label:'Total verwirrend'},
+      {val:'2', emoji:'🤯',   label:'Anspruchsvoll'},
+      {val:'3', emoji:'😐',   label:'Ich komme klar'},
+      {val:'4', emoji:'🫡',   label:'Recht einfach'},
+      {val:'5', emoji:'😏',   label:'Kinderleicht'},
+    ]},
+  { id:'q3',  type:'radio',            label:'Wie häufig interagierst du mit Next Level?',
+    options:['Selten','Hin und wieder','Regelmäßig','Täglich','Mehrmals täglich'] },
+  { id:'q4',  type:'radio',            label:'Welches Element macht dir am meisten Spaß?',
     options:['🏅 Abzeichen & Achievements sammeln','📊 Bestenliste & Vergleich mit anderen',
-             '🎯 Challenges','⚡ XP & Ränge','🔥 Streaksystem','Etwas anderes (bitte ausführen)'] },
+             '🎯 Challenges','⚡ XP & Ränge','🔥 Streaksystem','❓ Etwas anderes (bitte ausführen)'] },
   { id:'q4t', type:'conditional_text', label:'Was genau macht dir Spaß?', placeholder:'Bitte ausführen…',
-    triggerId:'q4', triggerValue:'Etwas anderes (bitte ausführen)' },
-  { id:'q5', type:'radio', label:'Hast du durch Next Level das Gefühl, dass deine Fortschritte im Ausbildungszentrum sichtbarer werden?',
+    triggerId:'q4', triggerValue:'❓ Etwas anderes (bitte ausführen)' },
+  { id:'q5',  type:'radio',            label:'Hast du durch Next Level das Gefühl, dass deine Fortschritte im Ausbildungszentrum sichtbarer werden?',
     options:['Ja, auf jeden Fall','Eher ja','Teils, teils','Eher nein','Nein, gar nicht'] },
-  { id:'q6', type:'scale', label:'Motiviert dich das Streak-System dazu, deine täglichen Aufgaben pünktlicher oder zuverlässiger zu erledigen?',
-    min:1, max:5, minLabel:'Gar nicht', maxLabel:'Ja, definitiv!' },
-  { id:'q7', type:'textarea', label:'Was würdest du dir noch wünschen oder verbessern?', placeholder:'Deine Ideen…' },
+  { id:'q6',  type:'emoji_scale',      label:'Motiviert dich das Streak-System dazu, deine täglichen Aufgaben pünktlicher oder zuverlässiger zu erledigen?',
+    options:[
+      {val:'1', emoji:'🙅', label:'Nein, gar nicht'},
+      {val:'2', emoji:'🤷', label:'Wenig'},
+      {val:'3', emoji:'🧘', label:'Ein bisschen'},
+      {val:'4', emoji:'🙋', label:'Überwiegend'},
+      {val:'5', emoji:'🏋️', label:'Ja, definitiv!'},
+    ]},
+  { id:'q7',  type:'textarea',         label:'Was würdest du dir noch wünschen oder verbessern?', placeholder:'Deine Ideen…' },
 ];
 
 window._umfrageAnswers = {};
@@ -5167,41 +5182,51 @@ function _renderSurveyNative() {
   const wrap = document.getElementById('surveyQWrap');
   if (!wrap) return;
   window._umfrageAnswers = {};
+  let _qNum = 0;
 
-  wrap.innerHTML = UMFRAGE_FRAGEN.map((q, qi) => {
-    const reqMark = `<span style="color:#ef4444;margin-left:2px">*</span>`;
-    const label = `<div style="font-weight:800;font-size:0.85rem;color:var(--cream);margin-bottom:8px">
-      ${UMFRAGE_FRAGEN.filter((x,i) => i<=qi && x.type!=='conditional_text').length}. ${q.label} ${reqMark}
-    </div>`;
+  wrap.innerHTML = UMFRAGE_FRAGEN.map((q) => {
+    const isSub = q.type === 'sub_textarea' || q.type === 'conditional_text';
+    if (!isSub) _qNum++;
+    const req = `<span style="color:#ef4444">*</span>`;
+    const mainLabel = `<div style="font-weight:800;font-size:0.85rem;color:var(--cream);margin-bottom:8px">${_qNum}. ${q.label} ${req}</div>`;
 
     // Stern-Bewertung
     if (q.type === 'stars') {
       const stars = Array.from({length:q.max},(_,i)=>i+1).map(n =>
         `<span data-star="${q.id}" data-val="${n}" onclick="_setStar('${q.id}',${n})"
-          style="font-size:2rem;cursor:pointer;transition:transform .1s;display:inline-block"
-          title="${q.labels[n-1]||''}">⭐</span>`
+          style="font-size:2rem;cursor:pointer;opacity:0.35;transition:opacity .15s,transform .15s;display:inline-block"
+          title="${q.starLabels?.[n-1]||''}">⭐</span>`
       ).join('');
-      return `<div style="margin-bottom:16px" id="wrap_${q.id}">
-        ${label}
-        <div style="display:flex;gap:4px;margin-bottom:6px" id="stars_${q.id}">${stars}</div>
+      return `<div style="margin-bottom:8px">${mainLabel}
+        <div style="display:flex;gap:4px;margin-bottom:4px">${stars}</div>
         <div id="starlabel_${q.id}" style="font-size:0.78rem;color:var(--prestige-color);min-height:18px"></div>
       </div>`;
     }
 
-    // Skala 1–5
-    if (q.type === 'scale') {
-      const btns = Array.from({length:q.max-q.min+1},(_,i)=>i+q.min).map(n =>
-        `<button type="button" data-scale="${q.id}" data-val="${n}" onclick="_setScale('${q.id}',${n})"
-          style="width:42px;height:42px;border-radius:50%;border:1.5px solid rgba(120,138,172,0.35);
-          background:rgba(255,255,255,0.04);color:var(--cream);font-weight:800;font-size:0.9rem;
-          cursor:pointer;transition:all .15s;font-family:var(--font-main)">${n}</button>`
+    // Unter-Textfeld (kein eigene Nummer, ↳ Prefix)
+    if (q.type === 'sub_textarea') {
+      return `<div style="margin-bottom:16px;padding-left:14px;border-left:2px solid rgba(120,138,172,0.3)">
+        <div style="font-weight:800;font-size:0.82rem;color:var(--text-muted);margin-bottom:6px">↳ ${q.label} ${req}</div>
+        <textarea oninput="window._umfrageAnswers['${q.id}']=this.value" placeholder="${q.placeholder||''}"
+          style="width:100%;min-height:65px;padding:9px 12px;background:var(--navy);border:1.5px solid var(--slate);
+          border-radius:10px;color:var(--cream);font-family:var(--font-main);font-size:0.83rem;resize:vertical;outline:none"
+          onfocus="this.style.borderColor='var(--prestige-color)'" onblur="this.style.borderColor='var(--slate)'"></textarea>
+      </div>`;
+    }
+
+    // Emoji-Skala
+    if (q.type === 'emoji_scale') {
+      const btns = q.options.map(o =>
+        `<button type="button" data-escale="${q.id}" data-val="${o.val}" onclick="_setEmojiScale('${q.id}','${o.val}')"
+          style="display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 10px;min-width:62px;
+          border-radius:10px;border:1.5px solid rgba(120,138,172,0.25);background:rgba(255,255,255,0.04);
+          cursor:pointer;transition:all .15s;font-family:var(--font-main)">
+          <span style="font-size:1.5rem">${o.emoji}</span>
+          <span style="font-size:0.65rem;color:var(--text-muted);text-align:center;line-height:1.3">${o.label}</span>
+        </button>`
       ).join('');
-      return `<div style="margin-bottom:16px">
-        ${label}
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${btns}</div>
-        <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--text-muted);margin-top:4px">
-          <span>${q.minLabel}</span><span>${q.maxLabel}</span>
-        </div>
+      return `<div style="margin-bottom:16px">${mainLabel}
+        <div style="display:flex;gap:6px;flex-wrap:wrap">${btns}</div>
       </div>`;
     }
 
@@ -5210,7 +5235,7 @@ function _renderSurveyNative() {
       const opts = q.options.map(o =>
         `<label data-qid="${q.id}" style="display:flex;align-items:center;gap:9px;padding:8px 12px;
           background:rgba(255,255,255,0.04);border:1.5px solid rgba(120,138,172,0.2);
-          border-radius:9px;cursor:pointer;font-size:0.83rem;transition:border-color .15s,background .15s"
+          border-radius:9px;cursor:pointer;font-size:0.83rem;transition:all .15s"
           onclick="document.querySelectorAll('[data-qid=\\'${q.id}\\']').forEach(l=>{
             l.style.borderColor='rgba(120,138,172,0.2)';l.style.background='rgba(255,255,255,0.04)'});
             this.style.borderColor='var(--prestige-color)';this.style.background='rgba(120,138,172,0.10)';
@@ -5219,43 +5244,34 @@ function _renderSurveyNative() {
           <input type="radio" name="${q.id}" value="${o}" style="accent-color:var(--prestige-color)"> ${o}
         </label>`
       ).join('');
-      return `<div style="margin-bottom:15px">
-        ${label}
+      return `<div style="margin-bottom:15px">${mainLabel}
         <div style="display:flex;flex-direction:column;gap:5px">${opts}</div>
       </div>`;
     }
 
-    // Bedingtes Textfeld (nur sichtbar wenn Trigger-Antwort gewählt)
+    // Bedingtes Textfeld
     if (q.type === 'conditional_text') {
-      return `<div id="cond_${q.id}" style="margin-bottom:15px;display:none">
-        <div style="font-weight:800;font-size:0.85rem;color:var(--cream);margin-bottom:7px">
-          ↳ ${q.label} ${reqMark}
-        </div>
-        <textarea oninput="window._umfrageAnswers['${q.id}']=this.value"
-          placeholder="${q.placeholder||''}"
+      return `<div id="cond_${q.id}" style="margin-bottom:15px;padding-left:14px;border-left:2px solid rgba(120,138,172,0.3);display:none">
+        <div style="font-weight:800;font-size:0.82rem;color:var(--text-muted);margin-bottom:6px">↳ ${q.label} ${req}</div>
+        <textarea oninput="window._umfrageAnswers['${q.id}']=this.value" placeholder="${q.placeholder||''}"
           style="width:100%;min-height:65px;padding:9px 12px;background:var(--navy);border:1.5px solid var(--slate);
-          border-radius:10px;color:var(--cream);font-family:var(--font-main);font-size:0.83rem;
-          resize:vertical;outline:none;transition:border-color .2s"
-          onfocus="this.style.borderColor='var(--prestige-color)'"
-          onblur="this.style.borderColor='var(--slate)'"></textarea>
+          border-radius:10px;color:var(--cream);font-family:var(--font-main);font-size:0.83rem;resize:vertical;outline:none"
+          onfocus="this.style.borderColor='var(--prestige-color)'" onblur="this.style.borderColor='var(--slate)'"></textarea>
       </div>`;
     }
 
     // Normales Textfeld
     if (q.type === 'textarea') {
-      return `<div style="margin-bottom:15px">
-        ${label}
-        <textarea oninput="window._umfrageAnswers['${q.id}']=this.value"
-          placeholder="${q.placeholder||'Dein Feedback…'}"
+      return `<div style="margin-bottom:15px">${mainLabel}
+        <textarea oninput="window._umfrageAnswers['${q.id}']=this.value" placeholder="${q.placeholder||'Dein Feedback…'}"
           style="width:100%;min-height:75px;padding:9px 12px;background:var(--navy);border:1.5px solid var(--slate);
-          border-radius:10px;color:var(--cream);font-family:var(--font-main);font-size:0.83rem;
-          resize:vertical;outline:none;transition:border-color .2s"
-          onfocus="this.style.borderColor='var(--prestige-color)'"
-          onblur="this.style.borderColor='var(--slate)'"></textarea>
+          border-radius:10px;color:var(--cream);font-family:var(--font-main);font-size:0.83rem;resize:vertical;outline:none"
+          onfocus="this.style.borderColor='var(--prestige-color)'" onblur="this.style.borderColor='var(--slate)'"></textarea>
       </div>`;
     }
     return '';
   }).join('');
+}
 }
 
 // Stern-Bewertung setzen
@@ -5284,6 +5300,17 @@ function _setScale(qid, val) {
   });
 }
 
+// Emoji-Skala setzen
+function _setEmojiScale(qid, val) {
+  window._umfrageAnswers[qid] = val;
+  document.querySelectorAll(`[data-escale="${qid}"]`).forEach(b => {
+    const active = b.dataset.val === val;
+    b.style.borderColor = active ? 'var(--prestige-color)' : 'rgba(120,138,172,0.25)';
+    b.style.background  = active ? 'rgba(120,138,172,0.18)' : 'rgba(255,255,255,0.04)';
+    b.style.transform   = active ? 'scale(1.08)' : 'scale(1)';
+  });
+}
+
 // Bedingte Textfelder ein-/ausblenden
 function _checkConditional() {
   UMFRAGE_FRAGEN.filter(q => q.type === 'conditional_text').forEach(q => {
@@ -5291,9 +5318,6 @@ function _checkConditional() {
     if (!el) return;
     el.style.display = window._umfrageAnswers[q.triggerId] === q.triggerValue ? '' : 'none';
   });
-}
-
-async function _submitSurveyNative() {
 }
 
 async function _submitSurveyNative() {
@@ -5350,8 +5374,12 @@ async function _submitSurveyNative() {
 }
 
 function _surveyLater() {
+  if (window._surveyForcePrev !== undefined) {
+    state.surveyDone = window._surveyForcePrev;
+    window._surveyForcePrev = undefined;
+  }
   closeModal('surveyModal');
-  showToast('⏰ Bis später! Die Umfrage erscheint beim nächsten XP erneut.');
+  showToast('⏰ Bis später! Die Umfrage erscheint beim nächsten Prestige-Aufstieg wieder.');
 }
 
 function closeSurveyModal() {
@@ -5369,6 +5397,13 @@ function checkSurveyTrigger() {
       setTimeout(() => modal.focus(), 50);
     }
   }
+}
+
+function adminForceShowSurvey() {
+  window._surveyForcePrev = state.surveyDone;
+  state.surveyDone = false;
+  _renderSurveyNative();
+  openModal('surveyModal');
 }
 
 function toggleShowcase(achId) {
@@ -5742,83 +5777,178 @@ async function renderUmfrageResults() {
   const wrap = document.getElementById('umfrageResultsWrap');
   if (!wrap) return;
   wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">⏳ Lade…</p>';
+  const allData = typeof window.firebaseGetUmfrage === 'function' ? await window.firebaseGetUmfrage() : [];
+  wrap.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;
+      padding:10px 14px;background:rgba(255,255,255,0.03);border-radius:10px;border:1px solid var(--card-border)">
+      <span style="font-size:0.78rem;color:var(--text-muted);font-weight:700">📅 Zeitraum:</span>
+      <input type="date" id="umfrageFrom" style="background:var(--navy);border:1px solid var(--slate);
+        color:var(--cream);border-radius:7px;padding:4px 8px;font-size:0.80rem;font-family:var(--font-main)">
+      <span style="color:var(--text-muted);font-size:0.78rem">bis</span>
+      <input type="date" id="umfrageTo" style="background:var(--navy);border:1px solid var(--slate);
+        color:var(--cream);border-radius:7px;padding:4px 8px;font-size:0.80rem;font-family:var(--font-main)">
+      <button class="btn btn-ghost btn-sm" onclick="_applyUmfrageFilter()" style="font-size:0.78rem">🔍 Filtern</button>
+      <button class="btn btn-ghost btn-sm" onclick="_clearUmfrageFilter()" style="font-size:0.78rem">✕ Zurücksetzen</button>
+      <span id="umfrageFilterInfo" style="font-size:0.75rem;color:var(--prestige-color)"></span>
+    </div>
+    <div id="umfrageBody"></div>`;
+  window._umfrageAllData = allData;
+  _renderUmfrageBody(allData);
+}
 
-  const data = typeof window.firebaseGetUmfrage === 'function'
-    ? await window.firebaseGetUmfrage() : [];
+function _applyUmfrageFilter() {
+  const from = document.getElementById('umfrageFrom')?.value;
+  const to   = document.getElementById('umfrageTo')?.value;
+  let data = window._umfrageAllData || [];
+  if (from) { const f=new Date(from).setHours(0,0,0,0);    data=data.filter(r=>(r.ts||0)>=f); }
+  if (to)   { const t=new Date(to).setHours(23,59,59,999); data=data.filter(r=>(r.ts||0)<=t); }
+  const info = document.getElementById('umfrageFilterInfo');
+  if (info) info.textContent = (from||to) ? `${data.length} Ergebnis${data.length!==1?'se':''}` : '';
+  _renderUmfrageBody(data);
+}
+
+function _clearUmfrageFilter() {
+  const fi=document.getElementById('umfrageFilterInfo'); if(fi) fi.textContent='';
+  const f=document.getElementById('umfrageFrom'); if(f) f.value='';
+  const t=document.getElementById('umfrageTo');   if(t) t.value='';
+  _renderUmfrageBody(window._umfrageAllData||[]);
+}
+
+async function _deleteUmfrageEntry(name) {
+  if (!confirm(`Antwort von „${name}" wirklich löschen?`)) return;
+  if (typeof window.firebaseDeleteUmfrage === 'function') await window.firebaseDeleteUmfrage(name);
+  window._umfrageAllData = (window._umfrageAllData||[]).filter(r=>r.name!==name);
+  _applyUmfrageFilter();
+  showToast(`🗑️ Antwort von ${name} gelöscht.`);
+}
+
+function _renderUmfrageBody(data) {
+  const body = document.getElementById('umfrageBody');
+  if (!body) return;
+  const fmt = ts => { if(!ts) return '–'; const d=new Date(ts);
+    return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`; };
 
   if (!data.length) {
-    wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">Noch keine Antworten vorhanden.</p>';
+    body.innerHTML='<p style="color:var(--text-muted);font-size:0.84rem">Keine Antworten im gewählten Zeitraum.</p>';
     return;
   }
 
-  const fmt = ts => {
-    const d = new Date(ts);
-    return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
-  };
-
-  // Auswertung pro Frage
   let html = `<div style="font-size:0.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;
-    letter-spacing:0.08em;margin-bottom:12px">📊 ${data.length} Antwort${data.length !== 1 ? 'en' : ''} gesamt</div>`;
+    letter-spacing:0.08em;margin-bottom:12px">📊 ${data.length} Antwort${data.length!==1?'en':''} gesamt</div>`;
 
   UMFRAGE_FRAGEN.forEach(q => {
-    html += `<div style="margin-bottom:20px;padding:14px 16px;background:rgba(255,255,255,0.03);
+    if (q.type === 'conditional_text' || q.type === 'sub_textarea') return;
+
+    html += `<div style="margin-bottom:18px;padding:14px 16px;background:rgba(255,255,255,0.03);
       border:1px solid var(--card-border);border-radius:12px">
       <div style="font-weight:800;font-size:0.86rem;color:var(--cream);margin-bottom:10px">${q.label}</div>`;
 
-    if (q.type === 'radio') {
-      // Zähle Optionen
+    if (q.type === 'stars') {
+      const vals = data.map(r=>parseFloat(r.answers?.[q.id])).filter(n=>!isNaN(n));
+      if (!vals.length) { html+='<p style="color:var(--text-muted);font-size:0.8rem">Noch keine Antworten.</p></div>'; return; }
+      const avg = (vals.reduce((a,b)=>a+b,0)/vals.length).toFixed(1);
+      html += `<div style="font-size:1.1rem;font-weight:800;color:var(--prestige-color);margin-bottom:8px">Ø ${avg} ⭐ / ${q.max}</div>`;
+      Array.from({length:q.max},(_,i)=>i+1).forEach(n => {
+        const cnt = vals.filter(v=>Math.round(v)===n).length;
+        const pct = vals.length>0?Math.round(cnt/vals.length*100):0;
+        html += `<div style="margin-bottom:5px;display:flex;align-items:center;gap:8px">
+          <span style="width:20px;text-align:center">⭐${n}</span>
+          <div style="flex:1">
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:2px">
+              <span style="color:var(--text-muted)">${q.starLabels?.[n-1]||''}</span>
+              <span style="font-weight:800;color:var(--prestige-color)">${cnt} (${pct}%)</span>
+            </div>
+            <div style="background:rgba(255,255,255,0.07);border-radius:50px;height:7px">
+              <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,rgba(90,106,138,0.5),var(--prestige-color));border-radius:50px"></div>
+            </div>
+          </div></div>`;
+      });
+
+    } else if (q.type === 'emoji_scale') {
+      const vals = data.map(r=>r.answers?.[q.id]).filter(Boolean);
+      if (!vals.length) { html+='<p style="color:var(--text-muted);font-size:0.8rem">Noch keine Antworten.</p></div>'; return; }
+      const numVals = vals.map(Number).filter(n=>!isNaN(n));
+      const avg = numVals.length ? (numVals.reduce((a,b)=>a+b,0)/numVals.length).toFixed(1) : '–';
+      html += `<div style="font-size:1rem;font-weight:800;color:var(--prestige-color);margin-bottom:8px">Ø ${avg}</div>`;
+      q.options.forEach(o => {
+        const cnt = vals.filter(v=>v===o.val).length;
+        const pct = vals.length>0?Math.round(cnt/vals.length*100):0;
+        html += `<div style="margin-bottom:5px;display:flex;align-items:center;gap:8px">
+          <span style="font-size:1.2rem;width:28px;text-align:center">${o.emoji}</span>
+          <div style="flex:1">
+            <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:2px">
+              <span style="color:var(--text-muted)">${o.label}</span>
+              <span style="font-weight:800;color:var(--prestige-color)">${cnt} (${pct}%)</span>
+            </div>
+            <div style="background:rgba(255,255,255,0.07);border-radius:50px;height:7px">
+              <div style="height:100%;width:${vals.length?Math.round(cnt/vals.length*100):0}%;
+                background:linear-gradient(90deg,rgba(90,106,138,0.5),var(--prestige-color));border-radius:50px"></div>
+            </div>
+          </div></div>`;
+      });
+
+    } else if (q.type === 'radio') {
       const counts = {};
-      q.options.forEach(o => counts[o] = 0);
-      data.forEach(r => { const a = r.answers?.[q.id]; if (a && counts[a] !== undefined) counts[a]++; });
-      const max = Math.max(...Object.values(counts), 1);
-      html += Object.entries(counts).map(([opt, cnt]) => {
-        const pct = Math.round((cnt / max) * 100);
-        const pctOfTotal = data.length > 0 ? Math.round((cnt / data.length) * 100) : 0;
-        return `<div style="margin-bottom:7px">
-          <div style="display:flex;justify-content:space-between;font-size:0.79rem;margin-bottom:3px">
+      q.options.forEach(o=>counts[o]=0);
+      data.forEach(r=>{ const a=r.answers?.[q.id]; if(a!==undefined&&counts[a]!==undefined) counts[a]++; });
+      const maxC = Math.max(...Object.values(counts),1);
+      Object.entries(counts).forEach(([opt,cnt]) => {
+        const pct=data.length>0?Math.round(cnt/data.length*100):0;
+        html += `<div style="margin-bottom:6px">
+          <div style="display:flex;justify-content:space-between;font-size:0.79rem;margin-bottom:2px">
             <span style="color:var(--text-muted)">${opt}</span>
-            <span style="font-weight:800;color:var(--prestige-color)">${cnt} (${pctOfTotal}%)</span>
+            <span style="font-weight:800;color:var(--prestige-color)">${cnt} (${pct}%)</span>
           </div>
-          <div style="background:rgba(255,255,255,0.07);border-radius:50px;height:8px;overflow:hidden">
-            <div style="height:100%;width:${pct}%;background:linear-gradient(90deg,rgba(90,106,138,0.6),var(--prestige-color));
-              border-radius:50px;transition:width .5s"></div>
-          </div>
-        </div>`;
-      }).join('');
+          <div style="background:rgba(255,255,255,0.07);border-radius:50px;height:7px">
+            <div style="height:100%;width:${Math.round(cnt/maxC*100)}%;
+              background:linear-gradient(90deg,rgba(90,106,138,0.5),var(--prestige-color));border-radius:50px"></div>
+          </div></div>`;
+      });
 
     } else if (q.type === 'textarea') {
-      const answers = data.map(r => r.answers?.[q.id]).filter(Boolean);
-      if (!answers.length) {
-        html += `<p style="color:var(--text-muted);font-size:0.81rem">Keine Freitextantworten.</p>`;
-      } else {
-        html += answers.map((a, i) => {
-          const entry = data.find(r => r.answers?.[q.id] === a);
-          return `<div style="padding:7px 10px;background:rgba(255,255,255,0.04);border-radius:8px;
-            margin-bottom:5px;font-size:0.81rem">
-            <span style="color:var(--text-muted);font-size:0.70rem">${entry?.name || '?'} · ${fmt(entry?.ts||0)} — </span>
-            ${a}
-          </div>`;
-        }).join('');
-      }
+      const answers = data.map(r=>({txt:(r.answers?.[q.id]||'').trim(),name:r.name,ts:r.ts})).filter(x=>x.txt);
+      if (!answers.length) { html+='<p style="color:var(--text-muted);font-size:0.81rem">Keine Antworten.</p>'; }
+      else answers.forEach(({txt,name,ts}) => {
+        html+=`<div style="padding:7px 10px;background:rgba(255,255,255,0.04);border-radius:8px;
+          margin-bottom:5px;font-size:0.81rem">
+          <span style="color:var(--text-muted);font-size:0.70rem">${name||'?'} · ${fmt(ts)} — </span>${txt}</div>`;
+      });
     }
-    html += `</div>`;
+    html += '</div>';
   });
 
-  // Einzelne Antworten (Tabelle)
+  // Einzel-Antworten mit Löschen-Button
   html += `<div style="font-size:0.72rem;font-weight:800;color:var(--text-muted);text-transform:uppercase;
     letter-spacing:0.08em;margin:16px 0 8px">📝 Alle Einzel-Antworten</div>
     <div style="display:flex;flex-direction:column;gap:5px">` +
-    data.map(r => `<div style="padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;font-size:0.79rem;
-      border-left:2px solid var(--prestige-color)">
-      <strong style="color:var(--prestige-color)">${r.name}</strong>
-      <span style="color:var(--text-muted);margin-left:8px">${fmt(r.ts)}</span>
-      ${UMFRAGE_FRAGEN.filter(q => q.type === 'radio').map(q =>
-        `<span style="color:var(--text-muted);margin-left:8px">· ${r.answers?.[q.id] || '–'}</span>`
-      ).join('')}
-    </div>`).join('') +
-    `</div>`;
+    data.map(r => {
+      const chips = UMFRAGE_FRAGEN
+        .filter(q=>!['textarea','sub_textarea','conditional_text'].includes(q.type))
+        .map(q => {
+          const a = r.answers?.[q.id]; if (!a) return '';
+          const disp = q.type==='stars' ? `⭐${a}`
+            : q.type==='emoji_scale' ? (q.options.find(o=>o.val===a)?.emoji||a)
+            : a.length > 20 ? a.slice(0,18)+'…' : a;
+          return `<span style="background:rgba(255,255,255,0.07);border-radius:4px;padding:1px 7px;
+            font-size:0.72rem;color:var(--text-muted)">${disp}</span>`;
+        }).filter(Boolean).join(' ');
+      const safeName = (r.name||'').replace(/'/g,"\\'");
+      return `<div style="padding:8px 12px;background:rgba(255,255,255,0.03);border-radius:8px;
+        border-left:2px solid var(--prestige-color);display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div style="flex:1;min-width:0;font-size:0.79rem">
+          <strong style="color:var(--prestige-color)">${r.name||'?'}</strong>
+          <span style="color:var(--text-muted);margin-left:8px;font-size:0.74rem">${fmt(r.ts)}</span>
+          <div style="margin-top:4px;display:flex;flex-wrap:wrap;gap:4px">${chips}</div>
+        </div>
+        <button onclick="_deleteUmfrageEntry('${safeName}')"
+          style="flex-shrink:0;background:rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.3);
+          color:#ef4444;border-radius:7px;padding:4px 10px;cursor:pointer;font-size:0.75rem;font-family:var(--font-main)"
+          onmouseover="this.style.background='rgba(239,68,68,0.22)'"
+          onmouseout="this.style.background='rgba(239,68,68,0.10)'">🗑️</button>
+      </div>`;
+    }).join('') + '</div>';
 
-  wrap.innerHTML = html;
+  body.innerHTML = html;
 }
 
 function scrollToMeInEwigkeit() {
@@ -6782,7 +6912,9 @@ function setActiveTitle(achId) {
 if (achId) {
     const eigenlob = ACHIEVEMENTS.find(a => a.id === 'eigenlob');
     if (eigenlob && !state.unlockedAchievements.some(u => u.id === 'eigenlob')) {
-      state.unlockedAchievements.push({ id:'eigenlob', ts:Date.now() });
+state.unlockedAchievements.push({ id:'eigenlob', ts:Date.now() });
+      addLogbuchEntry({ type:'achievement', icon:'😏', typeLabel:'Achievement',
+        title:'Eigenlob stimmt!', reward:'', desc:eigenlob.desc, ts:Date.now() });
       saveState(); render();
       _modalQueue.push({ type:'achievement', ach:eigenlob });
       if (!_modalBusy) processModalQueue();
