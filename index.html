@@ -1272,7 +1272,8 @@ activeTitle:   activeTitleText,
       modulWeeklyCount:   st.modulWeeklyCount || 0,
       schoolDayCount:     Object.values(st.schoolDays||{}).filter(Boolean).length,
       absenceCount:       (st.absences||[]).length,
-      totalOpenCount:     st.totalOpenCount || 1,
+totalOpenCount:     st.totalOpenCount || 1,
+      surveyDone:         st.surveyDone     || false,
       avgClicksPerDay:    st.totalOpenCount > 0
                           ? Math.round((st.totalClickCount||0)/(st.totalOpenCount||1)) : 0,
       lastCodeTs,
@@ -1358,6 +1359,11 @@ window.firebaseSaveUmfrage = async function(name, answers) {
       name, answers, ts: Date.now()
     });
   } catch(e) { console.warn('Umfrage speichern:', e); }
+};
+
+/** Umfrage: Einzelne Antwort löschen */
+window.firebaseDeleteUmfrage = async function(name) {
+  try { await _db.ref('umfrage/' + _fbKey(name)).remove(); } catch(e) {}
 };
 
 /** Umfrage: Alle Antworten laden (für Admin-Tab) */
@@ -1805,9 +1811,13 @@ window.firebaseCreateTestUser = async function(data) {
     <div style="font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--prestige-color);margin-bottom:6px">
       🎉 1.000 XP — Herzlichen Glückwunsch!
     </div>
-    <p style="color:var(--text-muted);font-size:0.84rem;margin-bottom:18px;line-height:1.6">
-      Ein toller Meilenstein! Bevor du weiterlegst, freuen wir uns über kurzes Feedback. Das dauert nur eine Minute. 🚀
+<p style="color:var(--text-muted);font-size:0.84rem;margin-bottom:6px;line-height:1.6">
+      Du hast dein erstes Prestige erreicht — Respekt! 🎉 Bevor du weiterlegst, freuen wir uns sehr über dein Feedback. Das dauert nur eine Minute.
     </p>
+    <div style="background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.35);border-radius:10px;
+      padding:9px 13px;font-size:0.82rem;color:#f59e0b;margin-bottom:16px;display:flex;align-items:center;gap:8px">
+      🎁 <span>Als Dankeschön erhältst du nach dem Absenden <strong>+200 XP</strong> und ein Achievement!</span>
+    </div>
     <div id="surveyQWrap"></div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
       <button class="btn btn-gold btn-wide" id="surveySubmitBtn" onclick="_submitSurveyNative()">✅ Absenden</button>
@@ -2147,7 +2157,7 @@ window.firebaseCreateTestUser = async function(data) {
   </div>
   <div class="header-right">
 <div class="profile-pic-wrap" style="display:inline-flex;align-items:center;gap:6px">
-<span id="adminModePill" title="Admin-Modus aktiviert">Admin-Modus</span>
+<span id="adminModePill" title="Admin-Modus aktiviert – klicken zum Beenden" onclick="closeAdminPanel()" style="cursor:pointer">Admin-Modus</span>
       <div id="profilePicCircle">👤</div>
     </div>
     <div class="header-user">
@@ -2938,7 +2948,10 @@ const ACHIEVEMENTS = [
 { id:'schausteller',         group:'misc',             emoji:'🎪', name:'Schausteller/in',          xp:75,  desc:'Erstes Achievement in die Vitrine gestellt.',  bonus:null,
     title:null,
     check:()=>false },
-  { id:'eigenlob',             group:'misc',             emoji:'😏', name:'Eigenlob stimmt!',         xp:0,   desc:'Einen Titel ausgewählt.',                      bonus:null,
+{ id:'feedbaecker',          group:'misc',             emoji:'🍞', name:'Feed-Bäcker/in',           xp:200, desc:'Die Umfrage ausgefüllt und Feedback gegeben.',bonus:null,
+    title:null,
+    check:()=>false },
+  { id:'eigenlob',             group:'misc',             emoji:'😏', name:'Eigenlob stimmt!',         xp:50,   desc:'Einen Titel ausgewählt.',                      bonus:null,
     title:null,
     check:()=>false },
 ];
@@ -3819,16 +3832,24 @@ function applyTheme(t) {
  */
 function addLogbuchEntry(entry) {
   if (!state.logbuch) state.logbuch = [];
-  // Global Timeline loggen (für Admin+ Timeline-Tab) — ALLE Ereignisse
-  if (state.name && typeof window.firebaseLogTimeline === 'function') {
+  // Global Timeline loggen — mit Retry wenn Firebase noch nicht bereit
+  if (state.name) {
     const xpNum = parseInt((entry.reward||'').replace(/\D/g,'')) || entry.xp || 0;
-    window.firebaseLogTimeline({
+    const tlEntry = {
       name:  state.name,
       xp:    xpNum,
-      title: entry.title   || '',
+      title: entry.title     || '',
       label: entry.typeLabel || '',
-      type:  entry.type    || 'misc',
-    });
+      type:  entry.type      || 'misc',
+    };
+    if (typeof window.firebaseLogTimeline === 'function') {
+      window.firebaseLogTimeline(tlEntry);
+    } else {
+      // Retry nach 3 Sekunden (Firebase noch nicht initialisiert)
+      setTimeout(() => {
+        if (typeof window.firebaseLogTimeline === 'function') window.firebaseLogTimeline(tlEntry);
+      }, 3000);
+    }
   }
   // Neueste Einträge zuerst
   state.logbuch.unshift({
@@ -3914,8 +3935,6 @@ function spawnXPFloat(xp) {
   el.style.top   = (window.innerHeight / 2 - 20) + 'px';
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 1500);
-  // Umfrage-Trigger ab 1000 XP (mit kurzer Verzögerung, damit XP-Float zuerst verschwindet)
-  if (!state.surveyDone) setTimeout(checkSurveyTrigger, 1600);
   // Pause-Achievement: erstes Mal XP zwischen 12-13 Uhr
   if (xp > 0 && new Date().getHours() === 12 && state.name) {
     if (!state.unlockedAchievements.some(u => u.id === 'pause')) {
@@ -5123,13 +5142,23 @@ function openVitrineInfo() { openModal('vitrineInfoModal'); }
    UMFRAGE — Native Fragen, Ergebnisse in Firebase
    ═══════════════════════════════════════════════════════════ */
 const UMFRAGE_FRAGEN = [
-  { id: 'q1', type: 'radio', label: 'Wie gefällt dir Next Level bisher?',
-    options: ['⭐⭐⭐⭐⭐ Sehr gut', '⭐⭐⭐⭐ Gut', '⭐⭐⭐ Geht so', '⭐⭐ Nicht so gut'] },
-  { id: 'q2', type: 'radio', label: 'Was motiviert dich am meisten?',
-    options: ['🏅 Abzeichen sammeln', '📊 Bestenliste', '🎯 Challenges', '⚡ XP & Ränge', '👥 Vergleich mit anderen'] },
-  { id: 'q3', type: 'radio', label: 'Wie häufig öffnest du Next Level?',
-    options: ['Täglich', 'Mehrmals pro Woche', 'Einmal pro Woche', 'Seltener'] },
-  { id: 'q4', type: 'textarea', label: 'Was würdest du dir noch wünschen oder verbessern?' },
+  { id:'q1', type:'stars', label:'Wie gefällt dir Next Level bisher?', max:5,
+    labels:['Überhaupt nicht','','','','Sehr gut'] },
+  { id:'q1t', type:'textarea', label:'Bitte begründe deine Auswahl kurz.', placeholder:'Deine Begründung…' },
+  { id:'q2', type:'scale', label:'Wie intuitiv findest du die Bedienung von Next Level?', min:1, max:5,
+    minLabel:'Total verwirrend', maxLabel:'Kinderleicht' },
+  { id:'q3', type:'radio', label:'Wie häufig interagierst du mit Next Level?',
+    options:['Sehr selten','Kaum','Hin und wieder','Regelmäßig','Täglich','Mehrmals täglich'] },
+  { id:'q4', type:'radio', label:'Welches Element macht dir am meisten Spaß?',
+    options:['🏅 Abzeichen & Achievements sammeln','📊 Bestenliste & Vergleich mit anderen',
+             '🎯 Challenges','⚡ XP & Ränge','🔥 Streaksystem','Etwas anderes (bitte ausführen)'] },
+  { id:'q4t', type:'conditional_text', label:'Was genau macht dir Spaß?', placeholder:'Bitte ausführen…',
+    triggerId:'q4', triggerValue:'Etwas anderes (bitte ausführen)' },
+  { id:'q5', type:'radio', label:'Hast du durch Next Level das Gefühl, dass deine Fortschritte im Ausbildungszentrum sichtbarer werden?',
+    options:['Ja, auf jeden Fall','Eher ja','Teils, teils','Eher nein','Nein, gar nicht'] },
+  { id:'q6', type:'scale', label:'Motiviert dich das Streak-System dazu, deine täglichen Aufgaben pünktlicher oder zuverlässiger zu erledigen?',
+    min:1, max:5, minLabel:'Gar nicht', maxLabel:'Ja, definitiv!' },
+  { id:'q7', type:'textarea', label:'Was würdest du dir noch wünschen oder verbessern?', placeholder:'Deine Ideen…' },
 ];
 
 window._umfrageAnswers = {};
@@ -5138,28 +5167,86 @@ function _renderSurveyNative() {
   const wrap = document.getElementById('surveyQWrap');
   if (!wrap) return;
   window._umfrageAnswers = {};
-  wrap.innerHTML = UMFRAGE_FRAGEN.map(q => {
+
+  wrap.innerHTML = UMFRAGE_FRAGEN.map((q, qi) => {
+    const reqMark = `<span style="color:#ef4444;margin-left:2px">*</span>`;
+    const label = `<div style="font-weight:800;font-size:0.85rem;color:var(--cream);margin-bottom:8px">
+      ${UMFRAGE_FRAGEN.filter((x,i) => i<=qi && x.type!=='conditional_text').length}. ${q.label} ${reqMark}
+    </div>`;
+
+    // Stern-Bewertung
+    if (q.type === 'stars') {
+      const stars = Array.from({length:q.max},(_,i)=>i+1).map(n =>
+        `<span data-star="${q.id}" data-val="${n}" onclick="_setStar('${q.id}',${n})"
+          style="font-size:2rem;cursor:pointer;transition:transform .1s;display:inline-block"
+          title="${q.labels[n-1]||''}">⭐</span>`
+      ).join('');
+      return `<div style="margin-bottom:16px" id="wrap_${q.id}">
+        ${label}
+        <div style="display:flex;gap:4px;margin-bottom:6px" id="stars_${q.id}">${stars}</div>
+        <div id="starlabel_${q.id}" style="font-size:0.78rem;color:var(--prestige-color);min-height:18px"></div>
+      </div>`;
+    }
+
+    // Skala 1–5
+    if (q.type === 'scale') {
+      const btns = Array.from({length:q.max-q.min+1},(_,i)=>i+q.min).map(n =>
+        `<button type="button" data-scale="${q.id}" data-val="${n}" onclick="_setScale('${q.id}',${n})"
+          style="width:42px;height:42px;border-radius:50%;border:1.5px solid rgba(120,138,172,0.35);
+          background:rgba(255,255,255,0.04);color:var(--cream);font-weight:800;font-size:0.9rem;
+          cursor:pointer;transition:all .15s;font-family:var(--font-main)">${n}</button>`
+      ).join('');
+      return `<div style="margin-bottom:16px">
+        ${label}
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">${btns}</div>
+        <div style="display:flex;justify-content:space-between;font-size:0.72rem;color:var(--text-muted);margin-top:4px">
+          <span>${q.minLabel}</span><span>${q.maxLabel}</span>
+        </div>
+      </div>`;
+    }
+
+    // Radio
     if (q.type === 'radio') {
-      const opts = q.options.map(o => `
-        <label data-qid="${q.id}" style="display:flex;align-items:center;gap:9px;padding:8px 12px;
+      const opts = q.options.map(o =>
+        `<label data-qid="${q.id}" style="display:flex;align-items:center;gap:9px;padding:8px 12px;
           background:rgba(255,255,255,0.04);border:1.5px solid rgba(120,138,172,0.2);
           border-radius:9px;cursor:pointer;font-size:0.83rem;transition:border-color .15s,background .15s"
           onclick="document.querySelectorAll('[data-qid=\\'${q.id}\\']').forEach(l=>{
             l.style.borderColor='rgba(120,138,172,0.2)';l.style.background='rgba(255,255,255,0.04)'});
             this.style.borderColor='var(--prestige-color)';this.style.background='rgba(120,138,172,0.10)';
-            window._umfrageAnswers['${q.id}']='${o.replace(/'/g,"\\'").replace(/"/g,'\\"')}'"
-          >
+            window._umfrageAnswers['${q.id}']='${o.replace(/'/g,"\\'").replace(/"/g,'\\"')}';
+            _checkConditional()">
           <input type="radio" name="${q.id}" value="${o}" style="accent-color:var(--prestige-color)"> ${o}
-        </label>`).join('');
+        </label>`
+      ).join('');
       return `<div style="margin-bottom:15px">
-        <div style="font-weight:800;font-size:0.85rem;color:var(--cream);margin-bottom:7px">${q.label}</div>
+        ${label}
         <div style="display:flex;flex-direction:column;gap:5px">${opts}</div>
       </div>`;
     }
+
+    // Bedingtes Textfeld (nur sichtbar wenn Trigger-Antwort gewählt)
+    if (q.type === 'conditional_text') {
+      return `<div id="cond_${q.id}" style="margin-bottom:15px;display:none">
+        <div style="font-weight:800;font-size:0.85rem;color:var(--cream);margin-bottom:7px">
+          ↳ ${q.label} ${reqMark}
+        </div>
+        <textarea oninput="window._umfrageAnswers['${q.id}']=this.value"
+          placeholder="${q.placeholder||''}"
+          style="width:100%;min-height:65px;padding:9px 12px;background:var(--navy);border:1.5px solid var(--slate);
+          border-radius:10px;color:var(--cream);font-family:var(--font-main);font-size:0.83rem;
+          resize:vertical;outline:none;transition:border-color .2s"
+          onfocus="this.style.borderColor='var(--prestige-color)'"
+          onblur="this.style.borderColor='var(--slate)'"></textarea>
+      </div>`;
+    }
+
+    // Normales Textfeld
     if (q.type === 'textarea') {
       return `<div style="margin-bottom:15px">
-        <div style="font-weight:800;font-size:0.85rem;color:var(--cream);margin-bottom:7px">${q.label}</div>
-        <textarea oninput="window._umfrageAnswers['${q.id}']=this.value" placeholder="Dein Feedback (optional)…"
+        ${label}
+        <textarea oninput="window._umfrageAnswers['${q.id}']=this.value"
+          placeholder="${q.placeholder||'Dein Feedback…'}"
           style="width:100%;min-height:75px;padding:9px 12px;background:var(--navy);border:1.5px solid var(--slate);
           border-radius:10px;color:var(--cream);font-family:var(--font-main);font-size:0.83rem;
           resize:vertical;outline:none;transition:border-color .2s"
@@ -5171,10 +5258,58 @@ function _renderSurveyNative() {
   }).join('');
 }
 
+// Stern-Bewertung setzen
+function _setStar(qid, val) {
+  window._umfrageAnswers[qid] = String(val);
+  const stars = document.querySelectorAll(`[data-star="${qid}"]`);
+  stars.forEach(s => {
+    const sv = parseInt(s.dataset.val);
+    s.style.opacity     = sv <= val ? '1' : '0.3';
+    s.style.transform   = sv <= val ? 'scale(1.15)' : 'scale(1)';
+  });
+  const q = UMFRAGE_FRAGEN.find(x => x.id === qid);
+  const lbl = document.getElementById('starlabel_'+qid);
+  if (lbl && q?.labels) lbl.textContent = q.labels[val-1] || '';
+}
+
+// Skala-Schaltfläche setzen
+function _setScale(qid, val) {
+  window._umfrageAnswers[qid] = String(val);
+  document.querySelectorAll(`[data-scale="${qid}"]`).forEach(b => {
+    const active = parseInt(b.dataset.val) === val;
+    b.style.background   = active ? 'var(--prestige-color)' : 'rgba(255,255,255,0.04)';
+    b.style.color        = active ? 'var(--navy)' : 'var(--cream)';
+    b.style.borderColor  = active ? 'var(--prestige-color)' : 'rgba(120,138,172,0.35)';
+    b.style.transform    = active ? 'scale(1.12)' : 'scale(1)';
+  });
+}
+
+// Bedingte Textfelder ein-/ausblenden
+function _checkConditional() {
+  UMFRAGE_FRAGEN.filter(q => q.type === 'conditional_text').forEach(q => {
+    const el = document.getElementById('cond_'+q.id);
+    if (!el) return;
+    el.style.display = window._umfrageAnswers[q.triggerId] === q.triggerValue ? '' : 'none';
+  });
+}
+
 async function _submitSurveyNative() {
-  const missing = UMFRAGE_FRAGEN.filter(q => q.type === 'radio' && !window._umfrageAnswers[q.id]);
+}
+
+async function _submitSurveyNative() {
+  const missing = UMFRAGE_FRAGEN.filter(q => {
+    if (q.required === false) return false;
+    if (q.type === 'radio') return !window._umfrageAnswers[q.id];
+    if (q.type === 'textarea') return !(window._umfrageAnswers[q.id]||'').trim();
+    if (q.type === 'conditional_text') {
+      if (window._umfrageAnswers[q.triggerId] === q.triggerValue)
+        return !(window._umfrageAnswers[q.id]||'').trim();
+      return false;
+    }
+    return false;
+  });
   if (missing.length) {
-    showToast(`⚠️ Bitte noch ${missing.length} Frage${missing.length > 1 ? 'n' : ''} beantworten!`);
+    showToast(`⚠️ Bitte noch ${missing.length} Pflichtfeld${missing.length > 1 ? 'er' : ''} ausfüllen!`);
     return;
   }
   const btn = document.getElementById('surveySubmitBtn');
@@ -5183,10 +5318,34 @@ async function _submitSurveyNative() {
   if (typeof window.firebaseSaveUmfrage === 'function') {
     await window.firebaseSaveUmfrage(state.name || '?', { ...window._umfrageAnswers });
   }
+
   state.surveyDone = true;
-  saveState();
+
+  // Feed-Bäcker Achievement + XP
+  const fbAch = ACHIEVEMENTS.find(a => a.id === 'feedbaecker');
+  if (fbAch && !state.unlockedAchievements.some(u => u.id === 'feedbaecker')) {
+    const gName = state.gender === 'female' ? 'Feed-Bäckerin' : 'Feed-Bäcker';
+    const fbEntry = { id:'feedbaecker', name:gName, emoji:'🍞', xp:200,
+      desc:fbAch.desc, ts:Date.now() };
+    state.unlockedAchievements.push(fbEntry);
+    state.xp      += 200;
+    state.totalXP  = (state.totalXP||0) + 200;
+    spawnXPFloat(200);
+    addLogbuchEntry({ type:'achievement', icon:'🍞', typeLabel:'Achievement',
+      title: gName, reward:'+200 XP', desc: fbAch.desc, ts: Date.now() });
+    // Timeline: Umfrage ausgefüllt
+    if (typeof window.firebaseLogTimeline === 'function') {
+      window.firebaseLogTimeline({ name: state.name, xp: 200, title: 'Umfrage ausgefüllt',
+        label: 'Umfrage', type: 'umfrage' });
+    }
+    saveState(); render();
+    setTimeout(() => scheduleModals([], [fbEntry]), 800);
+  } else {
+    saveState();
+  }
+
   closeModal('surveyModal');
-  showToast('✅ Danke für dein Feedback!');
+  showToast('✅ Danke für dein Feedback! +200 XP & Achievement erhalten!');
   fireBigConfetti();
 }
 
@@ -5202,7 +5361,7 @@ function closeSurveyModal() {
 
 function checkSurveyTrigger() {
   if (state.surveyDone) return;
-  if ((state.totalXP || state.xp || 0) >= 1000) {
+  if ((state.prestige || 0) >= 1) {
     const modal = document.getElementById('surveyModal');
     if (modal && modal.classList.contains('hidden')) {
       _renderSurveyNative();
@@ -6109,10 +6268,14 @@ ${e.activeTitle && e.titlePos !== 'suffix' ? `<span style="font-size:0.70rem;opa
       ${row('Weekly gesamt', e.weeklyCount||0)}
     </div>
 
-    ${sec('🗺️','Office Map')}
+${sec('🗺️','Office Map')}
     <div style="display:flex;flex-direction:column;gap:4px">
       ${row('Streak', `${e.officeMapStreak||0} Tag(e)`)}
       ${row('Gesamt Check-ins', e.officeMapTotal||0)}
+    </div>
+    ${sec('📋','Umfrage')}
+    <div style="display:flex;flex-direction:column;gap:4px">
+      ${row('Feedback abgegeben', e.surveyDone ? '✅ Ja' : '❌ Noch nicht', !!e.surveyDone)}
     </div>`;
 
 // Admin-Sektionen
@@ -6690,8 +6853,10 @@ function doPrestige() {
   const closeBtn = document.getElementById('prestigeCloseBtn');
   if (closeBtn) closeBtn.style.background = `linear-gradient(135deg, ${pc.color}, ${pc.glow})`;
 
-  openModal('prestigeModal');
+openModal('prestigeModal');
   fireBigConfetti();
+  // Umfrage-Trigger nach Prestige-Aufstieg
+  setTimeout(checkSurveyTrigger, 2500);
 }
 
 function closePrestigeModal() { closeModal('prestigeModal'); }
@@ -7322,8 +7487,6 @@ function spawnXPFloat(xp) {
   el.style.top   = (window.innerHeight / 2 - 20) + 'px';
   document.body.appendChild(el);
   setTimeout(() => el.remove(), 1500);
-  // Umfrage-Trigger ab 1000 XP (mit kurzer Verzögerung, damit XP-Float zuerst verschwindet)
-  if (!state.surveyDone) setTimeout(checkSurveyTrigger, 1600);
   // Pause-Achievement: erstes Mal XP zwischen 12-13 Uhr
 }
 </script>
