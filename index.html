@@ -2160,11 +2160,13 @@ window.firebaseCreateTestUser = async function(data) {
         </div>
         <div style="display:flex;flex-direction:column;gap:3px">
           <label style="font-size:0.69rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:0.06em">Bis</label>
-          <div class="date-pill" onclick="document.getElementById('absenceTo').showPicker()">
+<div class="date-pill" onclick="document.getElementById('absenceTo').showPicker()">
             <input type="date" id="absenceTo" oninput="updateDatePill(this)" style="color-scheme:dark">
             <span class="date-pill-label" id="absenceTo-lbl">📅 Klick</span>
           </div>
         </div>
+        <button class="btn btn-ghost btn-sm" style="flex-shrink:0" onclick="addAbsence()">+ Hinzufügen</button>
+      </div>
 
     <div class="divider"></div>
 
