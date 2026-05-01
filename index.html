@@ -1809,14 +1809,14 @@ window.firebaseCreateTestUser = async function(data) {
     animation:popIn .5s cubic-bezier(0.175,0.885,0.32,1.275) both;font-family:var(--font-main);
     max-height:92vh;overflow-y:auto;margin:16px auto">
     <div style="font-family:'Playfair Display',serif;font-size:1.2rem;color:var(--prestige-color);margin-bottom:6px">
-      🎉 1.000 XP — Herzlichen Glückwunsch!
+      🎉 Bronze Prestige — Herzlichen Glückwunsch!
     </div>
 <p style="color:var(--text-muted);font-size:0.84rem;margin-bottom:6px;line-height:1.6">
-      Du hast dein erstes Prestige erreicht — Respekt! 🎉 Bevor du weiterlegst, freuen wir uns sehr über dein Feedback. Das dauert nur eine Minute.
+      Du hast dein erstes Prestige erreicht Level — Respekt! 💪 Bevor du weiterlegst, freuen wir uns sehr über dein Feedback. Das dauert nur eine Minute.
     </p>
     <div style="background:rgba(245,158,11,0.10);border:1px solid rgba(245,158,11,0.35);border-radius:10px;
       padding:9px 13px;font-size:0.82rem;color:#f59e0b;margin-bottom:16px;display:flex;align-items:center;gap:8px">
-      🎁 <span>Als Dankeschön erhältst du nach dem Absenden <strong>+200 XP</strong> und ein Achievement!</span>
+      🎁 <span>Als Dankeschön erhältst du nach dem Absenden <strong>+200 XP</strong> und natürlich ein Achievement!</span>
     </div>
     <div id="surveyQWrap"></div>
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:14px">
@@ -2565,7 +2565,6 @@ window.firebaseCreateTestUser = async function(data) {
 <!-- TAB: Umfrage-Ergebnisse (nur Admin) -->
   <div class="tab-panel" id="tab-umfrage">
     <div class="tile-title"><span class="icon">📋</span> Umfrage-Ergebnisse</div>
-    <p style="color:var(--text-muted);font-size:0.84rem;margin-bottom:12px">Antworten aller Nutzer ab 1.000 XP.</p>
     <div style="display:flex;gap:8px;margin-bottom:14px">
 <button class="btn btn-ghost btn-sm" onclick="renderUmfrageResults()">🔄 Aktualisieren</button>
       <button class="btn btn-ghost btn-sm" onclick="adminForceShowSurvey()" style="border-color:var(--warning);color:var(--warning)">🔧 Umfrage anzeigen & testen</button>
@@ -5152,7 +5151,7 @@ const UMFRAGE_FRAGEN = [
     options:[
       {val:'1', emoji:'😵‍💫', label:'Total verwirrend'},
       {val:'2', emoji:'🤯',   label:'Anspruchsvoll'},
-      {val:'3', emoji:'😐',   label:'Ich komme klar'},
+      {val:'3', emoji:'😐',   label:'OK'},
       {val:'4', emoji:'🫡',   label:'Recht einfach'},
       {val:'5', emoji:'😏',   label:'Kinderleicht'},
     ]},
@@ -5160,11 +5159,11 @@ const UMFRAGE_FRAGEN = [
     options:['Selten','Hin und wieder','Regelmäßig','Täglich','Mehrmals täglich'] },
   { id:'q4',  type:'radio',            label:'Welches Element macht dir am meisten Spaß?',
     options:['🏅 Abzeichen & Achievements sammeln','📊 Bestenliste & Vergleich mit anderen',
-             '🎯 Challenges','⚡ XP & Ränge','🔥 Streaksystem','❓ Etwas anderes (bitte ausführen)'] },
+             '🎯 Challenges','⚡ XP & Ränge','🔥 Streaksystem','❓ Etwas anderes'] },
   { id:'q4t', type:'conditional_text', label:'Was genau macht dir Spaß?', placeholder:'Bitte ausführen…',
     triggerId:'q4', triggerValue:'❓ Etwas anderes (bitte ausführen)' },
   { id:'q5',  type:'radio',            label:'Hast du durch Next Level das Gefühl, dass deine Fortschritte im Ausbildungszentrum sichtbarer werden?',
-    options:['Ja, auf jeden Fall','Eher ja','Teils, teils','Eher nein','Nein, gar nicht'] },
+	options:['Gar nicht','eher nein','Teils, teils','Eher ja','Auf jeden Fall!'] },
   { id:'q6',  type:'emoji_scale',      label:'Motiviert dich das Streak-System dazu, deine täglichen Aufgaben pünktlicher oder zuverlässiger zu erledigen?',
     options:[
       {val:'1', emoji:'🙅', label:'Nein, gar nicht'},
