@@ -5958,7 +5958,7 @@ function _renderUmfrageBody(data) {
         const cnt = vals.filter(v=>Math.round(v)===n).length;
         const pct = vals.length>0?Math.round(cnt/vals.length*100):0;
         html += `<div style="margin-bottom:5px;display:flex;align-items:center;gap:8px">
-          <span style="width:20px;text-align:center">⭐${n}</span>
+<span style="width:20px;text-align:center">⭐</span>
           <div style="flex:1">
             <div style="display:flex;justify-content:space-between;font-size:0.78rem;margin-bottom:2px">
               <span style="color:var(--text-muted)">${q.starLabels?.[n-1]||''}</span>
@@ -7270,9 +7270,8 @@ function tlRenderFiltered() {
   const groups = [
     { id:'g-today',    label:'Heute',         test: i => i.ts >= todayS,                         open: true  },
     { id:'g-yesterday',label:'Gestern',        test: i => i.ts >= yesterdayS && i.ts < todayS,    open: false },
-    { id:'g-week',     label:'Letzte Woche',  test: i => i.ts >= weekS && i.ts < yesterdayS,      open: false },
-    { id:'g-month',    label:'Letzter Monat', test: i => i.ts >= monthS && i.ts < weekS,           open: false },
-    { id:'g-older',    label:'Älter',         test: i => i.ts < monthS,                            open: false },
+{ id:'g-week',     label:'Letzte Woche',  test: i => i.ts >= weekS && i.ts < yesterdayS,      open: false },
+    { id:'g-older',    label:'Älter',         test: i => i.ts < weekS,                             open: false },
   ];
 
   const makeRow = it => {
@@ -7324,6 +7323,24 @@ function tlRenderFiltered() {
   el.innerHTML = html;
 }
 
+async function umOpenUserDetail(name) {
+  if (!name) return;
+  let entry = (_umUsersCache||[]).find(u => u.name === name);
+  if (!entry && typeof window.firebaseGetAllUsers === 'function') {
+    try {
+      const all = await window.firebaseGetAllUsers();
+      entry = all.find(u => u.name === name);
+    } catch(err) {}
+  }
+  if (!entry && state && state.name === name) {
+    entry = { ...state };
+  }
+  if (!entry) { showToast('⚠️ Nutzerdaten nicht gefunden.'); return; }
+  const fake = document.createElement('button');
+  fake.dataset.entry = JSON.stringify(entry);
+  openUserDetailLive(fake);
+}
+
 async function tlOpenUserDetail(name) {
   if (!name) return;
   // Nutzer aus Cache oder Firebase laden
@@ -7331,6 +7348,9 @@ async function tlOpenUserDetail(name) {
   if (!entry && typeof window.firebaseGetAllUsers === 'function') {
     const all = await window.firebaseGetAllUsers();
     entry = all.find(u => u.name === name);
+  }
+if (!entry && state && state.name === name) {
+    entry = { ...state };
   }
   if (!entry) { showToast('⚠️ Nutzerdaten nicht gefunden.'); return; }
   // Fake-Button mit data-entry um openUserDetailLive zu nutzen
@@ -7571,27 +7591,27 @@ const strFields = ['name', 'module', 'rank'];
         ${th('module','Modul')}
         ${th('xp','⚡ XP')}
         ${th('badges','🏅')}
-        ${th('firstLogin','📅 Erster Login')}
+        ${th('firstLogin','📅 1. Login')}
         ${th('updated','🕐 Letzter Login')}
         <th></th>
       </tr></thead><tbody>`;
 
-  sorted.forEach(e => {
+sorted.forEach(e => {
     const isTest = e.isTestUser ? ' <span style="color:var(--warning);font-size:0.72rem">🧪</span>' : '';
     const safeName = (e.name||'').replace(/'/g,"\\'");
     html += `<tr>
-      <td style="text-align:left"><strong>${e.name||'?'}${isTest}</strong>
-        <div style="font-size:0.72rem;color:var(--text-muted)">${e.rank||'–'}</div></td>
-      <td>${e.module||'–'}</td>
+      <td style="text-align:left"><strong onclick="umOpenUserDetail('${safeName}')"
+        style="cursor:pointer;color:var(--prestige-color);text-decoration:underline dotted"
+        title="Profil öffnen">${e.name||'?'}${isTest}</strong></td>
       <td><strong>${(e.xp||0).toLocaleString('de-DE')}</strong></td>
       <td>${e.badges||0}</td>
       <td style="color:var(--text-muted)">${_fmtDate(e.firstLogin)}</td>
       <td style="color:var(--text-muted)">${_fmtDate(e.updated)}</td>
-      <td style="display:flex;gap:4px">
-<button class="btn btn-sm" style="padding:3px 7px;font-size:0.70rem;background:rgba(245,158,11,0.15);border:1.5px solid var(--warning);color:var(--warning)"
-            onclick="setInactiveUser('${safeName}')" title="Archivieren">📦</button>
+<td style="display:flex;gap:4px">
         <button class="btn btn-sm" style="padding:3px 7px;font-size:0.70rem;background:rgba(59,130,246,0.12);border:1.5px solid rgba(59,130,246,0.6);color:#3b82f6"
-            onclick="exportUserBackup('${safeName}')" title="Backup-Code exportieren & kopieren">💾</button>
+            onclick="exportUserBackup('${safeName}')" title="Backup-Code exportieren">💾</button>
+        <button class="btn btn-sm" style="padding:3px 7px;font-size:0.70rem;background:rgba(245,158,11,0.15);border:1.5px solid var(--warning);color:var(--warning)"
+            onclick="setInactiveUser('${safeName}')" title="Archivieren">📦</button>
         <button class="btn btn-danger btn-sm" style="padding:3px 8px;font-size:0.72rem"
             onclick="deleteFirebaseUser('${safeName}')" title="Löschen">🗑️</button>
       </td>
