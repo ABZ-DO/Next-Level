@@ -2629,6 +2629,18 @@ window.firebaseCreateTestUser = async function(data) {
     <div id="tlFilterBox" style="padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:9px;
       border:1px solid var(--card-border);margin-bottom:12px;transition:border-color .2s,box-shadow .2s">
 
+<!-- Schnellfilter -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
+        <button class="btn btn-ghost btn-sm" id="tlf-today"     onclick="tlSetFilter('today')"    >Heute</button>
+        <button class="btn btn-ghost btn-sm" id="tlf-yesterday" onclick="tlSetFilter('yesterday')" >Gestern</button>
+        <button class="btn btn-ghost btn-sm" id="tlf-thisweek"  onclick="tlSetFilter('thisweek')" >Diese Woche</button>
+        <button class="btn btn-ghost btn-sm" id="tlf-lastweek"  onclick="tlSetFilter('lastweek')" >Letzte Woche</button>
+        <button class="btn btn-ghost btn-sm" id="tlf-thismonth" onclick="tlSetFilter('thismonth')">Dieser Monat</button>
+        <button class="btn btn-ghost btn-sm" id="tlf-lastmonth" onclick="tlSetFilter('lastmonth')">Letzter Monat</button>
+        <button class="btn btn-ghost btn-sm" id="tlf-older"     onclick="tlSetFilter('older')"    >Älter</button>
+        <button class="btn btn-ghost btn-sm" id="tlf-all"       onclick="tlSetFilter('all')"      >Alle</button>
+      </div>
+
       <!-- Von/Bis -->
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <span style="font-size:0.78rem;color:var(--text-muted);font-weight:700">Von/Bis:</span>
@@ -7173,17 +7185,15 @@ function _tlWeekStart() {
 function tlSetFilter(mode) {
   _tlFilterMode = mode;
   const isFiltered = mode !== 'all';
-  // Schnellfilter-Buttons hervorheben
-  ['today','yesterday','week','all'].forEach(m => {
+  ['today','yesterday','thisweek','lastweek','thismonth','lastmonth','older','all'].forEach(m => {
     const b = document.getElementById('tlf-'+m);
     if (!b) return;
-    b.style.opacity      = m === mode ? '1' : '0.55';
-    b.style.fontWeight   = m === mode ? '800' : '';
-    b.style.background   = m === mode ? 'rgba(120,138,172,0.25)' : '';
-    b.style.borderColor  = m === mode ? 'var(--prestige-color)' : '';
-    b.style.color        = m === mode ? 'var(--prestige-color)' : '';
+    b.style.opacity     = m === mode ? '1' : '0.55';
+    b.style.fontWeight  = m === mode ? '800' : '';
+    b.style.background  = m === mode ? 'rgba(120,138,172,0.25)' : '';
+    b.style.borderColor = m === mode ? 'var(--prestige-color)' : '';
+    b.style.color       = m === mode ? 'var(--prestige-color)' : '';
   });
-  // Filter-Box deutlich hervorheben wenn aktiv
   const box = document.getElementById('tlFilterBox');
   if (box) {
     box.style.borderColor = isFiltered ? 'var(--prestige-color)' : 'var(--card-border)';
@@ -7194,26 +7204,32 @@ function tlSetFilter(mode) {
 }
 
 function tlGetFiltered() {
-  const items = _tlAllItems;
-  if (_tlFilterMode === 'today') {
-    const s = _tlDayStart(_tlToday()), e = _tlDayEnd(_tlToday());
-    return items.filter(i => i.ts >= s && i.ts <= e);
-  }
-  if (_tlFilterMode === 'yesterday') {
-    const s = _tlDayStart(_tlYesterday()), e = _tlDayEnd(_tlYesterday());
-    return items.filter(i => i.ts >= s && i.ts <= e);
-  }
-  if (_tlFilterMode === 'week') {
-    return items.filter(i => i.ts >= _tlWeekStart());
-  }
+  const items      = _tlAllItems;
+  const now        = new Date();
+  const todayS     = _tlDayStart(new Date());
+  const yesterdayS = _tlDayStart(_tlYesterday());
+  const yesterdayE = _tlDayEnd(_tlYesterday());
+  const thisWeekS  = _tlWeekStart();
+  const lastWeekS  = thisWeekS - 7 * 24 * 60 * 60 * 1000;
+  const thisMonthS = _tlDayStart(new Date(now.getFullYear(), now.getMonth(), 1));
+  const lastMonthS = _tlDayStart(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+
+  if (_tlFilterMode === 'today')     return items.filter(i => i.ts >= todayS);
+  if (_tlFilterMode === 'yesterday') return items.filter(i => i.ts >= yesterdayS && i.ts <= yesterdayE);
+  if (_tlFilterMode === 'thisweek')  return items.filter(i => i.ts >= thisWeekS);
+  if (_tlFilterMode === 'lastweek')  return items.filter(i => i.ts >= lastWeekS && i.ts < thisWeekS);
+  if (_tlFilterMode === 'thismonth') return items.filter(i => i.ts >= thisMonthS);
+  if (_tlFilterMode === 'lastmonth') return items.filter(i => i.ts >= lastMonthS && i.ts < thisMonthS);
+  if (_tlFilterMode === 'older')     return items.filter(i => i.ts < lastMonthS);
   if (_tlFilterMode === 'custom') {
-    const f = document.getElementById('tlFrom')?.value;
-    const t = document.getElementById('tlTo')?.value;
-    let from = f ? _tlDayStart(new Date(f)) : 0;
-    let to   = t ? _tlDayEnd(new Date(t))   : Infinity;
+    const f    = document.getElementById('tlFrom')?.value;
+    const t    = document.getElementById('tlTo')?.value;
+    const from = f ? _tlDayStart(new Date(f)) : 0;
+    const to   = t ? _tlDayEnd(new Date(t))   : Infinity;
     return items.filter(i => i.ts >= from && i.ts <= to);
   }
   return items; // 'all'
+}
 }
 
 async function renderTimeline() {
@@ -7236,95 +7252,56 @@ function tlRenderFiltered() {
     return;
   }
 
+  const shortModes = ['today', 'yesterday'];
+  const useShort   = shortModes.includes(_tlFilterMode);
+
   const fmt = ts => {
     if (!ts) return '–';
     const d = new Date(ts);
-    return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
   };
   const fmtFull = ts => {
     if (!ts) return '–';
     const d = new Date(ts);
-    return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    return String(d.getDate()).padStart(2,'0') + '.'
+      + String(d.getMonth()+1).padStart(2,'0') + '.'
+      + d.getFullYear() + ' '
+      + String(d.getHours()).padStart(2,'0') + ':'
+      + String(d.getMinutes()).padStart(2,'0');
   };
   const typeIcon = { badge:'🏅', achievement:'🏆', rank:'⬆️', prestige:'✨',
     challenge:'📅', modul_challenge:'🌐', office_map:'📍', rename:'✏️', umfrage:'📋', misc:'📌' };
 
-// Gruppen definieren
-  const todayS     = _tlDayStart(new Date());
-  const todayE     = _tlDayEnd(new Date());
-  const yesterdayS = _tlDayStart(_tlYesterday());
-
-  // Aktuelle Kalenderwoche (Montag)
-  const thisWeekS  = _tlWeekStart();
-  // Letzte Kalenderwoche (Montag bis Sonntag davor)
-  const lastWeekS  = thisWeekS - 7 * 24 * 60 * 60 * 1000;
-  const lastWeekE  = thisWeekS - 1;
-
-  // Aktueller Monat
-  const now        = new Date();
-  const thisMonthS = _tlDayStart(new Date(now.getFullYear(), now.getMonth(), 1));
-  // Letzter Monat
-  const lastMonthS = _tlDayStart(new Date(now.getFullYear(), now.getMonth() - 1, 1));
-  const lastMonthE = thisMonthS - 1;
-
-  // Gruppen: lückenlos, überschneidungsfrei
-  const groups = [
-    { id:'g-today',      label:'Heute',         test: i => i.ts >= todayS,                                   open: true  },
-    { id:'g-yesterday',  label:'Gestern',        test: i => i.ts >= yesterdayS && i.ts < todayS,              open: false },
-    { id:'g-thisweek',   label:'Diese Woche',    test: i => i.ts >= thisWeekS  && i.ts < yesterdayS,          open: false },
-    { id:'g-lastweek',   label:'Letzte Woche',   test: i => i.ts >= lastWeekS  && i.ts <= lastWeekE,          open: false },
-    { id:'g-thismonth',  label:'Dieser Monat',   test: i => i.ts >= thisMonthS && i.ts < lastWeekS,           open: false },
-    { id:'g-lastmonth',  label:'Letzter Monat',  test: i => i.ts >= lastMonthS && i.ts <= lastMonthE,         open: false },
-    { id:'g-older',      label:'Älter',          test: i => i.ts < lastMonthS,                                open: false },
-  ];
-
   const makeRow = it => {
-    const icon   = typeIcon[it.type] || '📌';
-    const xpStr  = it.xp > 0
-      ? `<span style="color:var(--prestige-color);font-weight:800;flex-shrink:0">+${it.xp.toLocaleString('de-DE')} XP</span>`
+    const icon     = typeIcon[it.type] || '📌';
+    const xpStr    = it.xp > 0
+      ? '<span style="color:var(--prestige-color);font-weight:800;flex-shrink:0">+'
+        + it.xp.toLocaleString('de-DE') + ' XP</span>'
       : '';
-    const detail = [it.label, it.title].filter(Boolean).join(' · ');
-    const timeStr = _tlFilterMode === 'all' ? fmtFull(it.ts) : fmt(it.ts);
-    const safeEntry = JSON.stringify({name:it.name||'',xp:it.xp||0,module:it.module||''}).replace(/'/g,"&#39;");
-    return `<div style="display:grid;grid-template-columns:${_tlFilterMode==='all'?'120px':'52px'} 18px 95px 1fr auto;
-      gap:6px;align-items:center;padding:4px 10px;
-      background:rgba(255,255,255,0.03);border-radius:7px;font-size:0.79rem;
-      border-left:2px solid rgba(120,138,172,0.15)">
-      <span style="color:var(--text-muted);font-size:0.72rem;white-space:nowrap">${timeStr}</span>
-      <span>${icon}</span>
-      <span onclick="tlOpenUserDetail('${(it.name||'').replace(/'/g,"\\'")}')"
-        style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-        cursor:pointer;color:var(--prestige-color);text-decoration:underline dotted"
-        title="Nutzerprofil anzeigen">${it.name||'?'}</span>
-      <span style="color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${detail}</span>
-      ${xpStr}
-    </div>`;
+    const detail   = [it.label, it.title].filter(Boolean).join(' · ');
+    const timeStr  = useShort ? fmt(it.ts) : fmtFull(it.ts);
+    const colW     = useShort ? '52px' : '120px';
+    const safeName = (it.name||'').replace(/'/g,"\\'");
+    return '<div style="display:grid;grid-template-columns:' + colW + ' 18px 95px 1fr auto;'
+      + 'gap:6px;align-items:center;padding:4px 10px;'
+      + 'background:rgba(255,255,255,0.03);border-radius:7px;font-size:0.79rem;'
+      + 'border-left:2px solid rgba(120,138,172,0.15)">'
+      + '<span style="color:var(--text-muted);font-size:0.72rem;white-space:nowrap">' + timeStr + '</span>'
+      + '<span>' + icon + '</span>'
+      + '<span onclick="tlOpenUserDetail(\'' + safeName + '\')"'
+      + ' style="font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'
+      + 'cursor:pointer;color:var(--prestige-color);text-decoration:underline dotted"'
+      + ' title="Nutzerprofil anzeigen">' + (it.name||'?') + '</span>'
+      + '<span style="color:var(--text-muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + detail + '</span>'
+      + xpStr
+      + '</div>';
   };
 
-  let html = `<div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:10px">
-    ${items.length} Einträge · ${_tlAllItems.length} gesamt</div>`;
-
-  groups.forEach(g => {
-    const gItems = items.filter(g.test);
-    if (!gItems.length) return;
-    html += `
-      <div style="margin-bottom:8px;border:1px solid var(--card-border);border-radius:10px;overflow:hidden">
-        <div onclick="tlToggleGroup('${g.id}')" style="display:flex;justify-content:space-between;align-items:center;
-          padding:9px 14px;background:rgba(255,255,255,0.04);cursor:pointer;user-select:none">
-          <span style="font-weight:800;font-size:0.84rem">${g.label}</span>
-          <span style="display:flex;align-items:center;gap:8px">
-            <span style="font-size:0.74rem;color:var(--text-muted)">${gItems.length} Einträge</span>
-            <span id="${g.id}-arrow" style="font-size:0.70rem;transition:transform .2s;
-              display:inline-block;transform:${g.open?'rotate(90deg)':'rotate(0deg)'}">▶</span>
-          </span>
-        </div>
-        <div id="${g.id}" style="display:${g.open?'flex':'none'};flex-direction:column;gap:3px;padding:6px 8px">
-          ${gItems.map(makeRow).join('')}
-        </div>
-      </div>`;
-  });
-
-  el.innerHTML = html;
+  el.innerHTML = '<div style="font-size:0.72rem;color:var(--text-muted);margin-bottom:10px">'
+    + items.length + ' Einträge · ' + _tlAllItems.length + ' gesamt</div>'
+    + '<div style="display:flex;flex-direction:column;gap:3px">'
+    + items.map(makeRow).join('')
+    + '</div>';
 }
 
 async function umOpenUserDetail(name) {
