@@ -1379,7 +1379,21 @@ window.firebaseGetUmfrage = async function() {
 /** Timeline: XP-Ereignis global loggen */
 window.firebaseLogTimeline = async function(entry) {
   if (!entry || !entry.name) return;
-  try { await _db.ref('timeline').push({ ...entry, ts: Date.now() }); } catch(e) {}
+  try {
+    await _db.ref('timeline').push({ ...entry, ts: Date.now() });
+  } catch(e) {
+    console.error('[Timeline] Schreibfehler – vermutlich Firebase Rules fehlen für "timeline":', e.message);
+  }
+};
+
+/** Timeline-Diagnose (für Admin) */
+window.firebaseTestTimelineWrite = async function() {
+  try {
+    await _db.ref('timeline').push({ name:'_test_', xp:0, title:'Diagnose', label:'Test', type:'test', ts:Date.now() });
+    return 'OK';
+  } catch(e) {
+    return 'FEHLER: ' + e.message;
+  }
 };
 
 /** Timeline: Letzte N Ereignisse laden */
@@ -2578,6 +2592,10 @@ window.firebaseCreateTestUser = async function(data) {
   <div class="tab-panel" id="tab-timeline">
     <div class="tile-title"><span class="icon">📡</span> Globale Timeline</div>
     <p style="color:var(--text-muted);font-size:0.84rem;margin-bottom:12px">Alle XP-Ereignisse aller Nutzer*innen in Echtzeit.</p>
+<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap">
+      <button class="btn btn-ghost btn-sm" onclick="renderTimeline()">🔄 Aktualisieren</button>
+      <button class="btn btn-ghost btn-sm" onclick="(async()=>{const r=await window.firebaseTestTimelineWrite?.();showToast(r==='OK'?'✅ Schreibzugriff OK!':'❌ '+r);})()" style="border-color:var(--warning);color:var(--warning)">🔧 Schreibzugriff testen</button>
+    </div>
     <div id="timelineList" style="display:flex;flex-direction:column;gap:4px">
       <p style="color:var(--text-muted);font-size:0.84rem">⏳ Lade Timeline…</p>
     </div>
@@ -5320,14 +5338,14 @@ function _checkConditional() {
 
 async function _submitSurveyNative() {
   const missing = UMFRAGE_FRAGEN.filter(q => {
-    if (q.required === false) return false;
-    if (q.type === 'radio') return !window._umfrageAnswers[q.id];
-    if (q.type === 'textarea') return !(window._umfrageAnswers[q.id]||'').trim();
     if (q.type === 'conditional_text') {
       if (window._umfrageAnswers[q.triggerId] === q.triggerValue)
         return !(window._umfrageAnswers[q.id]||'').trim();
       return false;
     }
+    if (q.type === 'sub_textarea') return !(window._umfrageAnswers[q.id]||'').trim();
+    if (q.type === 'radio' || q.type === 'stars' || q.type === 'emoji_scale') return !window._umfrageAnswers[q.id];
+    if (q.type === 'textarea') return !(window._umfrageAnswers[q.id]||'').trim();
     return false;
   });
   if (missing.length) {
@@ -5337,8 +5355,22 @@ async function _submitSurveyNative() {
   const btn = document.getElementById('surveySubmitBtn');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Speichere…'; }
 
+  // Im Admin-Force-Modus: anderen Key nutzen (Timestamp), damit bestehende Antwort nicht überschrieben wird
+  const isForce = window._surveyForcePrev !== undefined;
+  const saveKey = isForce ? `${state.name||'?'}_${Date.now()}` : (state.name || '?');
   if (typeof window.firebaseSaveUmfrage === 'function') {
-    await window.firebaseSaveUmfrage(state.name || '?', { ...window._umfrageAnswers });
+    await window.firebaseSaveUmfrage(saveKey, { ...window._umfrageAnswers });
+  }
+
+  if (isForce) {
+    // Admin-Test: surveyDone NICHT dauerhaft setzen, Button wieder aktivieren
+    window._surveyForcePrev = undefined;
+    const btn2 = document.getElementById('surveySubmitBtn');
+    if (btn2) { btn2.disabled = false; btn2.textContent = '✅ Absenden'; }
+    closeModal('surveyModal');
+    showToast('✅ Test-Antwort gespeichert! (Im Umfrage-Tab sichtbar)');
+    renderUmfrageResults?.();
+    return;
   }
 
   state.surveyDone = true;
@@ -5779,12 +5811,20 @@ async function renderUmfrageResults() {
   wrap.innerHTML = `
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px;
       padding:10px 14px;background:rgba(255,255,255,0.03);border-radius:10px;border:1px solid var(--card-border)">
-      <span style="font-size:0.78rem;color:var(--text-muted);font-weight:700">📅 Zeitraum:</span>
-      <input type="date" id="umfrageFrom" style="background:var(--navy);border:1px solid var(--slate);
-        color:var(--cream);border-radius:7px;padding:4px 8px;font-size:0.80rem;font-family:var(--font-main)">
+<span style="font-size:0.78rem;color:var(--text-muted);font-weight:700">📅 Zeitraum:</span>
+      <div onclick="document.getElementById('umfrageFrom').showPicker()" style="cursor:pointer;display:flex;align-items:center;gap:5px;
+        background:var(--navy);border:1px solid var(--slate);border-radius:7px;padding:4px 8px">
+        <span style="font-size:0.80rem;color:#fff">📅</span>
+        <input type="date" id="umfrageFrom" onclick="event.stopPropagation()" style="background:transparent;border:none;
+          color:var(--cream);font-size:0.80rem;font-family:var(--font-main);outline:none;cursor:pointer;color-scheme:dark">
+      </div>
       <span style="color:var(--text-muted);font-size:0.78rem">bis</span>
-      <input type="date" id="umfrageTo" style="background:var(--navy);border:1px solid var(--slate);
-        color:var(--cream);border-radius:7px;padding:4px 8px;font-size:0.80rem;font-family:var(--font-main)">
+      <div onclick="document.getElementById('umfrageTo').showPicker()" style="cursor:pointer;display:flex;align-items:center;gap:5px;
+        background:var(--navy);border:1px solid var(--slate);border-radius:7px;padding:4px 8px">
+        <span style="font-size:0.80rem;color:#fff">📅</span>
+        <input type="date" id="umfrageTo" onclick="event.stopPropagation()" style="background:transparent;border:none;
+          color:var(--cream);font-size:0.80rem;font-family:var(--font-main);outline:none;cursor:pointer;color-scheme:dark">
+      </div>
       <button class="btn btn-ghost btn-sm" onclick="_applyUmfrageFilter()" style="font-size:0.78rem">🔍 Filtern</button>
       <button class="btn btn-ghost btn-sm" onclick="_clearUmfrageFilter()" style="font-size:0.78rem">✕ Zurücksetzen</button>
       <span id="umfrageFilterInfo" style="font-size:0.75rem;color:var(--prestige-color)"></span>
@@ -7189,66 +7229,92 @@ function adminResetDailyChallenge() {
 // NEU: Benutzerverwaltungs-Funktionen — VOR function adminResetWeeklyChallenge einfügen
 
 // NEUE VERSION — nutzt Compat-SDK
+let _umSortKey = 'updated';
+let _umSortDir = -1; // -1 = absteigend
+let _umUsersCache = [];
+
+const _fmtDate = ts => {
+  if (!ts) return '–';
+  const d = new Date(ts);
+  return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`;
+};
+
 async function loadUserMgmtList() {
   const wrap  = document.getElementById('userMgmtList');
   const count = document.getElementById('userMgmtCount');
   if (!wrap) return;
   if (typeof window.firebaseGetAllUsers !== 'function') {
-    wrap.innerHTML = '<p style="color:var(--error);font-size:0.84rem">⚠️ Firebase nicht verbunden. Bitte Seite neu laden.</p>';
+    wrap.innerHTML = '<p style="color:var(--error);font-size:0.84rem">⚠️ Firebase nicht verbunden.</p>';
     return;
   }
   wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">⏳ Lade Nutzer…</p>';
   try {
-    const users = await window.firebaseGetAllUsers();
-    if (!users.length) {
-      wrap.innerHTML = '<p style="color:var(--text-muted);font-size:0.84rem">Keine Nutzer vorhanden.</p>';
-      if (count) count.textContent = '';
-      return;
-    }
-    if (count) count.textContent = `${users.length} Nutzer`;
-
-    const sorted = [...users].sort((a,b) => (b.xp||0) - (a.xp||0));
-    let html = `<div style="overflow-x:auto">
-      <table class="lb-table" style="width:100%;font-size:0.82rem">
-        <thead><tr>
-          <th style="text-align:left">👤 Name</th>
-          <th>Modul</th>
-          <th>⚡ XP</th>
-          <th>🏅</th>
-          <th>📅 Erster Login</th>
-          <th>🕐 Letzter Login</th>
-          <th></th>
-        </tr></thead><tbody>`;
-
-    sorted.forEach(e => {
-      const first  = e.firstLogin ? new Date(e.firstLogin).toLocaleDateString('de-DE') : '–';
-      const last   = e.updated   ? new Date(e.updated).toLocaleDateString('de-DE')    : '–';
-      const isTest = e.isTestUser ? ' <span style="color:var(--warning);font-size:0.72rem">🧪</span>' : '';
-      const safeName = (e.name||'').replace(/'/g,"\\'");
-      html += `<tr>
-        <td style="text-align:left"><strong>${e.name||'?'}${isTest}</strong>
-          <div style="font-size:0.72rem;color:var(--text-muted)">${e.rank||'–'}</div></td>
-        <td>${e.module||'–'}</td>
-        <td><strong>${(e.xp||0).toLocaleString('de-DE')}</strong></td>
-        <td>${e.badges||0}</td>
-        <td style="color:var(--text-muted)">${first}</td>
-        <td style="color:var(--text-muted)">${last}</td>
-<td style="display:flex;gap:4px">
-          <button class="btn btn-sm" style="padding:3px 7px;font-size:0.70rem;background:rgba(245,158,11,0.15);border:1.5px solid var(--warning);color:var(--warning)"
-              onclick="setInactiveUser('${safeName}')">📦</button>
-          <button class="btn btn-danger btn-sm" style="padding:3px 8px;font-size:0.72rem"
-              onclick="deleteFirebaseUser('${safeName}')">🗑️</button>
-        </td>
-      </tr>`;
-    });
-    html += '</tbody></table></div>';
-    wrap.innerHTML = html;
-
-// Vitrine-Dropdowns mit Achievements befüllen
+    _umUsersCache = await window.firebaseGetAllUsers();
+    if (count) count.textContent = `${_umUsersCache.length} Nutzer`;
+    _renderUserMgmtTable();
     _fillVitrineDropdowns();
   } catch(err) {
     wrap.innerHTML = `<p style="color:var(--error);font-size:0.84rem">❌ Fehler: ${err.message}</p>`;
   }
+}
+
+function _umSetSort(key) {
+  if (_umSortKey === key) _umSortDir *= -1;
+  else { _umSortKey = key; _umSortDir = key === 'name' ? 1 : -1; }
+  _renderUserMgmtTable();
+}
+
+function _renderUserMgmtTable() {
+  const wrap = document.getElementById('userMgmtList');
+  if (!wrap || !_umUsersCache.length) return;
+
+  const users = _umUsersCache;
+  const key = _umSortKey, dir = _umSortDir;
+  const sorted = [...users].sort((a,b) => {
+    let va = a[key], vb = b[key];
+    if (key === 'name') { va=(va||'').toLowerCase(); vb=(vb||'').toLowerCase(); }
+    else { va=Number(va)||0; vb=Number(vb)||0; }
+    return va < vb ? -dir : va > vb ? dir : 0;
+  });
+
+  const arrow = (k) => k === key ? (dir>0?'▲':'▼') : '';
+  const th = (k, label) =>
+    `<th onclick="_umSetSort('${k}')" style="cursor:pointer;user-select:none;white-space:nowrap">
+      ${label} <span style="font-size:0.65rem;opacity:0.7">${arrow(k)}</span></th>`;
+
+  let html = `<div style="overflow-x:auto">
+    <table class="lb-table" style="width:100%;font-size:0.82rem">
+      <thead><tr>
+        ${th('name','👤 Name')}
+        ${th('module','🚀')}
+        ${th('xp','⚡ XP')}
+        ${th('badges','🏅')}
+        ${th('firstLogin','📅 Erster Login')}
+        ${th('updated','🕐 Letzter Login')}
+        <th></th>
+      </tr></thead><tbody>`;
+
+  sorted.forEach(e => {
+    const isTest = e.isTestUser ? ' <span style="color:var(--warning);font-size:0.72rem">🧪</span>' : '';
+    const safeName = (e.name||'').replace(/'/g,"\\'");
+    html += `<tr>
+      <td style="text-align:left"><strong>${e.name||'?'}${isTest}</strong>
+        <div style="font-size:0.72rem;color:var(--text-muted)">${e.rank||'–'}</div></td>
+      <td>${e.module||'–'}</td>
+      <td><strong>${(e.xp||0).toLocaleString('de-DE')}</strong></td>
+      <td>${e.badges||0}</td>
+      <td style="color:var(--text-muted)">${_fmtDate(e.firstLogin)}</td>
+      <td style="color:var(--text-muted)">${_fmtDate(e.updated)}</td>
+      <td style="display:flex;gap:4px">
+        <button class="btn btn-sm" style="padding:3px 7px;font-size:0.70rem;background:rgba(245,158,11,0.15);border:1.5px solid var(--warning);color:var(--warning)"
+            onclick="setInactiveUser('${safeName}')">📦</button>
+        <button class="btn btn-danger btn-sm" style="padding:3px 8px;font-size:0.72rem"
+            onclick="deleteFirebaseUser('${safeName}')">🗑️</button>
+      </td>
+    </tr>`;
+  });
+  html += '</tbody></table></div>';
+  wrap.innerHTML = html;
 }
 
 function _fillVitrineDropdowns() {
