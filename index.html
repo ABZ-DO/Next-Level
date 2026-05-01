@@ -2629,14 +2629,6 @@ window.firebaseCreateTestUser = async function(data) {
     <div id="tlFilterBox" style="padding:10px 12px;background:rgba(255,255,255,0.03);border-radius:9px;
       border:1px solid var(--card-border);margin-bottom:12px;transition:border-color .2s,box-shadow .2s">
 
-      <!-- Schnellfilter -->
-      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">
-        <button class="btn btn-ghost btn-sm" id="tlf-today"     onclick="tlSetFilter('today')"    >Heute</button>
-        <button class="btn btn-ghost btn-sm" id="tlf-yesterday" onclick="tlSetFilter('yesterday')" >Gestern</button>
-        <button class="btn btn-ghost btn-sm" id="tlf-week"      onclick="tlSetFilter('week')"     >Diese Woche</button>
-        <button class="btn btn-ghost btn-sm" id="tlf-all"       onclick="tlSetFilter('all')"      >Alle</button>
-      </div>
-
       <!-- Von/Bis -->
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <span style="font-size:0.78rem;color:var(--text-muted);font-weight:700">Von/Bis:</span>
@@ -7257,21 +7249,33 @@ function tlRenderFiltered() {
   const typeIcon = { badge:'🏅', achievement:'🏆', rank:'⬆️', prestige:'✨',
     challenge:'📅', modul_challenge:'🌐', office_map:'📍', rename:'✏️', umfrage:'📋', misc:'📌' };
 
-  // Gruppen definieren
-  const now       = Date.now();
-  const todayS    = _tlDayStart(new Date());
-  const todayE    = _tlDayEnd(new Date());
-  const yesterdayS= _tlDayStart(_tlYesterday());
-  const yesterdayE= _tlDayEnd(_tlYesterday());
-  const weekS     = _tlWeekStart();
-  const monthS    = _tlDayStart(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+// Gruppen definieren
+  const todayS     = _tlDayStart(new Date());
+  const todayE     = _tlDayEnd(new Date());
+  const yesterdayS = _tlDayStart(_tlYesterday());
 
-// Gruppen mit lückenloser, überschneidungsfreier Logik
+  // Aktuelle Kalenderwoche (Montag)
+  const thisWeekS  = _tlWeekStart();
+  // Letzte Kalenderwoche (Montag bis Sonntag davor)
+  const lastWeekS  = thisWeekS - 7 * 24 * 60 * 60 * 1000;
+  const lastWeekE  = thisWeekS - 1;
+
+  // Aktueller Monat
+  const now        = new Date();
+  const thisMonthS = _tlDayStart(new Date(now.getFullYear(), now.getMonth(), 1));
+  // Letzter Monat
+  const lastMonthS = _tlDayStart(new Date(now.getFullYear(), now.getMonth() - 1, 1));
+  const lastMonthE = thisMonthS - 1;
+
+  // Gruppen: lückenlos, überschneidungsfrei
   const groups = [
-    { id:'g-today',    label:'Heute',         test: i => i.ts >= todayS,                         open: true  },
-    { id:'g-yesterday',label:'Gestern',        test: i => i.ts >= yesterdayS && i.ts < todayS,    open: false },
-{ id:'g-week',     label:'Letzte Woche',  test: i => i.ts >= weekS && i.ts < yesterdayS,      open: false },
-    { id:'g-older',    label:'Älter',         test: i => i.ts < weekS,                             open: false },
+    { id:'g-today',      label:'Heute',         test: i => i.ts >= todayS,                                   open: true  },
+    { id:'g-yesterday',  label:'Gestern',        test: i => i.ts >= yesterdayS && i.ts < todayS,              open: false },
+    { id:'g-thisweek',   label:'Diese Woche',    test: i => i.ts >= thisWeekS  && i.ts < yesterdayS,          open: false },
+    { id:'g-lastweek',   label:'Letzte Woche',   test: i => i.ts >= lastWeekS  && i.ts <= lastWeekE,          open: false },
+    { id:'g-thismonth',  label:'Dieser Monat',   test: i => i.ts >= thisMonthS && i.ts < lastWeekS,           open: false },
+    { id:'g-lastmonth',  label:'Letzter Monat',  test: i => i.ts >= lastMonthS && i.ts <= lastMonthE,         open: false },
+    { id:'g-older',      label:'Älter',          test: i => i.ts < lastMonthS,                                open: false },
   ];
 
   const makeRow = it => {
@@ -7597,25 +7601,29 @@ const strFields = ['name', 'module', 'rank'];
       </tr></thead><tbody>`;
 
 sorted.forEach(e => {
-    const isTest = e.isTestUser ? ' <span style="color:var(--warning);font-size:0.72rem">🧪</span>' : '';
+    const isTest   = e.isTestUser ? ' <span style="color:var(--warning);font-size:0.72rem">🧪</span>' : '';
     const safeName = (e.name||'').replace(/'/g,"\\'");
-    html += `<tr>
-      <td style="text-align:left"><strong onclick="umOpenUserDetail('${safeName}')"
-        style="cursor:pointer;color:var(--prestige-color);text-decoration:underline dotted"
-        title="Profil öffnen">${e.name||'?'}${isTest}</strong></td>
-      <td><strong>${(e.xp||0).toLocaleString('de-DE')}</strong></td>
-      <td>${e.badges||0}</td>
-      <td style="color:var(--text-muted)">${_fmtDate(e.firstLogin)}</td>
-      <td style="color:var(--text-muted)">${_fmtDate(e.updated)}</td>
-<td style="display:flex;gap:4px">
-        <button class="btn btn-sm" style="padding:3px 7px;font-size:0.70rem;background:rgba(59,130,246,0.12);border:1.5px solid rgba(59,130,246,0.6);color:#3b82f6"
-            onclick="exportUserBackup('${safeName}')" title="Backup-Code exportieren">💾</button>
-        <button class="btn btn-sm" style="padding:3px 7px;font-size:0.70rem;background:rgba(245,158,11,0.15);border:1.5px solid var(--warning);color:var(--warning)"
-            onclick="setInactiveUser('${safeName}')" title="Archivieren">📦</button>
-        <button class="btn btn-danger btn-sm" style="padding:3px 8px;font-size:0.72rem"
-            onclick="deleteFirebaseUser('${safeName}')" title="Löschen">🗑️</button>
-      </td>
-    </tr>`;
+    const nameCell = (e.name||'?') + isTest;
+    const modCell  = e.module||'–';
+    const xpCell   = (e.xp||0).toLocaleString('de-DE');
+    html += '<tr>'
+      + '<td style="text-align:left"><span onclick="umOpenUserDetail(\'' + safeName + '\')"'
+      + ' style="font-weight:700;cursor:pointer;color:var(--cream)"'
+      + ' title="Profil öffnen">' + nameCell + '</span></td>'
+      + '<td>' + modCell + '</td>'
+      + '<td><strong>' + xpCell + '</strong></td>'
+      + '<td>' + (e.badges||0) + '</td>'
+      + '<td style="color:var(--text-muted)">' + _fmtDate(e.firstLogin) + '</td>'
+      + '<td style="color:var(--text-muted)">' + _fmtDate(e.updated) + '</td>'
+      + '<td style="display:flex;gap:4px">'
+      + '<button class="btn btn-sm" style="padding:3px 7px;font-size:0.70rem;background:rgba(59,130,246,0.12);border:1.5px solid rgba(59,130,246,0.6);color:#3b82f6"'
+      + ' onclick="exportUserBackup(\'' + safeName + '\')" title="Backup-Code exportieren">💾</button>'
+      + '<button class="btn btn-sm" style="padding:3px 7px;font-size:0.70rem;background:rgba(245,158,11,0.15);border:1.5px solid var(--warning);color:var(--warning)"'
+      + ' onclick="setInactiveUser(\'' + safeName + '\')" title="Archivieren">📦</button>'
+      + '<button class="btn btn-danger btn-sm" style="padding:3px 8px;font-size:0.72rem"'
+      + ' onclick="deleteFirebaseUser(\'' + safeName + '\')" title="Löschen">🗑️</button>'
+      + '</td>'
+      + '</tr>';
   });
   html += '</tbody></table></div>';
   wrap.innerHTML = html;
