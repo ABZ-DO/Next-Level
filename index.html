@@ -1397,13 +1397,19 @@ window.firebaseTestTimelineWrite = async function() {
 };
 
 /** Timeline: Letzte N Ereignisse laden */
-window.firebaseGetTimeline = async function(limit = 200) {
+window.firebaseGetTimeline = async function(limit = 300) {
   try {
-    const snap = await _db.ref('timeline').orderByChild('ts').limitToLast(limit).once('value');
+    // Ohne orderByChild — kein Index nötig, Sortierung clientseitig
+    const snap = await _db.ref('timeline').once('value');
     const items = [];
-    snap.forEach(child => items.unshift(child.val()));
-    return items;
-  } catch(e) { return []; }
+    snap.forEach(child => { const v = child.val(); if (v && v.ts) items.push(v); });
+    items.sort((a, b) => (b.ts || 0) - (a.ts || 0));
+    console.log('[Timeline] Einträge geladen:', items.length);
+    return items.slice(0, limit);
+  } catch(e) {
+    console.error('[Timeline] Ladefehler:', e.message);
+    return [];
+  }
 };
 
 /** Admin: Test-User in RTDB anlegen */
